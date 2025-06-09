@@ -122,6 +122,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+    fun writeToFile(file: File, content: String) {
+        file.printWriter().use { out -> out.println(content) }
+    }
+
 
     private fun handleUserInput(context: Context, inputText: String) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -143,7 +147,14 @@ class MainActivity : AppCompatActivity() {
             val maxRepetitiveActions = 3
             val steps = mutableListOf<JSONObject>()
 
+            val managerPromptFile = File(logDir, "manager_prompt_$.txt")
+            val managerOutputFile = File(logDir, "manager_output_$.txt")
+            val operatorPromptFile = File(logDir, "operator_prompt_$.txt")
+            val operatorOutputFile = File(logDir, "operator_output_$.txt")
+
             while (iteration < maxItr) {
+
+
                 iteration++
 //                Thread.sleep(10000)
                 // Step 1: Take Perception
@@ -161,6 +172,8 @@ class MainActivity : AppCompatActivity() {
                 val manager = Manager()
                 val promptPlan = manager.getPrompt(infoPool)
                 val chatPlan = manager.initChat()
+                writeToFile(managerPromptFile, promptPlan+ timestamp)
+                writeToFile(managerPromptFile, chatPlan[0].second[0].text+ timestamp)
                 val combinedChatPlan  = addResponse("user",promptPlan, chatPlan, screenshotFile )
                 val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
 
@@ -169,16 +182,22 @@ class MainActivity : AppCompatActivity() {
                 infoPool.currentSubgoal =  parsedManagerPlan["current_subgoal"].toString()
                 infoPool.lastActionThought = parsedManagerPlan["thought"].toString()
                 infoPool.lastSummary = infoPool.lastActionThought
+                infoPool.importantNotes = parsedManagerPlan["notes"].toString()
                 println(parsedManagerPlan)
+                writeToFile(managerOutputFile, parsedManagerPlan.toString()+ timestamp)
 
                 // Step 3 Operator's turn, he will execute on the plan of manager
                 val operator = Operator(finger)
                 val actionPrompt = operator.getPrompt(infoPool)
-
                 val actionChat = operator.initChat()
+                writeToFile(operatorPromptFile, actionPrompt+ timestamp)
+                writeToFile(operatorPromptFile, actionChat[0].second[0].toString()+ timestamp)
+
                 val actionCombinedChat  = addResponse("user",actionPrompt, actionChat, screenshotPath )
                 var actionOutput = getReasoningModelApiResponse(actionCombinedChat, apiKey = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
+                infoPool.actionHistory.add(actionOutput + infoPool.currentSubgoal)
                 println("ACTION OUTPUT :::: $actionOutput")
+                writeToFile(operatorOutputFile, actionOutput + timestamp)
                 val screenshotLogger: (String) -> Unit = { filename ->
                     println("Saving screenshot: $filename")
                 }
@@ -238,7 +257,7 @@ class MainActivity : AppCompatActivity() {
 //                infoPool.errorDescriptions.add(parsedReflection["error_description"].toString())
 //                infoPool.progressStatus = parsedReflection["progress_status"].toString()
 //                // Step 7: Delay before next step
-                Thread.sleep(1500)
+                Thread.sleep(150)
             }
         }
     }

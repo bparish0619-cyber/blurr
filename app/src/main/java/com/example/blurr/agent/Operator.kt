@@ -12,6 +12,8 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import androidx.compose.runtime.currentComposer
+import com.example.blurr.agent.Operator.ShortcutStep
 import java.io.FileOutputStream
 
 data class AtomicActionSignature(
@@ -47,25 +49,6 @@ data class Shortcut(
 )
 
 
-data class ShortcutStep(
-    val name: String,
-    val argumentsMap: Map<String, String>
-)
-
-val initShortcuts = mapOf(
-    "Tap_Type_and_Enter" to Shortcut(
-        name = "Tap_Type_and_Enter",
-        arguments = listOf("x", "y", "text"),
-        description = "Tap an input box at (x, y), type the text, then press Enter.",
-        precondition = "Text input box is empty.",
-        atomicActionSequence = listOf(
-            ShortcutStep("Tap", mapOf("x" to "x", "y" to "y")),
-            ShortcutStep("Type", mapOf("text" to "text")),
-            ShortcutStep("Enter", emptyMap())
-        )
-    )
-)
-
 class Operator(private val finger: Finger) : BaseAgent() {
 
     override fun initChat(): List<Pair<String, List<TextPart>>> {
@@ -82,7 +65,10 @@ class Operator(private val finger: Finger) : BaseAgent() {
             
             ## NOTE ##
             - If you need to tap the search bar or icon try looking for Magnifying Glass icon. Generally it is used for search.
-            
+            - Make sure to add a magnifying glass and label it as search. It is generally used for search.
+            - Only return the JSON array. Do not include any explanation, markdown, or code formatting.
+            - Do not include text outside of the JSON array. Do not use markdown, do not wrap in code blocks, and do not use ellipsis. [Sometime when parsing time, it give json parse error, example 6:23am]
+
             Guidelines:
             - Think like a real user: imagine tapping, typing, swiping, or navigating based on what is visible on the screen.
             - Instead taping every key when keyboard is open, use the Action Type.
@@ -90,6 +76,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
             - Use shortcuts when they are applicable to speed up common tasks.
             - Use accurate pixel coordinates for actions such as 'Tap' or 'Swipe'.
             - You may use available shortcuts, but you must ensure the preconditions are satisfied.
+            - Don't click on Logos, if you want search, just stick to the search bar/icons.
             - If you see a keyboard on the screen, and your goals are to type, just start typing instead of enabling the input text box (Keyboard means the inputbox enabled)
 
             Output format:
@@ -119,13 +106,14 @@ class Operator(private val finger: Finger) : BaseAgent() {
         sb.appendLine("### Overall Plan ###")
         sb.appendLine(infoPool.plan)
         sb.appendLine()
-
-        sb.appendLine("### Progress Status ###")
-        sb.appendLine(infoPool.progressStatus.ifEmpty { "No progress yet." })
-        sb.appendLine()
+//        NOTE: Uncomment this ASAP
+//        sb.appendLine("### Progress Status ###")
+//        sb.appendLine(infoPool.progressStatus.ifEmpty { "No progress yet." })
+//        sb.appendLine()
 
         sb.appendLine("### Current Subgoal ###")
         sb.appendLine(infoPool.currentSubgoal)
+        println("CURRENT SUBGOAL : ${infoPool.currentSubgoal}")
         sb.appendLine()
 
         sb.appendLine("### Screen Information ###")
@@ -153,6 +141,15 @@ class Operator(private val finger: Finger) : BaseAgent() {
             sb.appendLine(infoPool.importantNotes)
         }
 
+        if (infoPool.actionHistory.isNotEmpty()) {
+            sb.appendLine("### Action History (Order of execution) ###")
+            var cnt = 0
+            infoPool.actionHistory.forEach { element ->
+                cnt++
+                sb.appendLine("- $cnt. $element")
+            }
+        }
+
 
         sb.appendLine("\n---")
         sb.appendLine("Carefully decide the next action. Choose one from atomic actions or available shortcuts.")
@@ -166,15 +163,13 @@ class Operator(private val finger: Finger) : BaseAgent() {
             sb.appendLine("- $name(${sig.arguments.joinToString()}): ${sig.description(infoPool)}")
         }
 
-        sb.appendLine("\n#### Shortcuts ####")
-        if (infoPool.shortcuts.isNotEmpty()) {
-            infoPool.shortcuts.forEach { (name, shortcut) ->
-                sb.appendLine("- ${shortcut.name}(${shortcut.arguments.joinToString()}): ${shortcut.description} | Precondition: ${shortcut.precondition}")
-            }
-        } else {
-            sb.appendLine("No shortcuts available.")
-        }
+        sb.appendLine("\n#### Shortcuts (Built-in only) ####")
+        sb.appendLine("The following shortcuts are predefined and often useful (especially Tap_Type_and_Enter). Use them when their preconditions are satisfied.")
 
+        (initShortcuts + infoPool.shortcuts).forEach { (name, shortcut) ->
+            sb.appendLine("- ${shortcut.name}(${shortcut.arguments.joinToString()}): ${shortcut.description} | Precondition: ${shortcut.precondition}")
+            println("Shortcut: ${shortcut.name}(${shortcut.arguments.joinToString()}): ${shortcut.description} | Precondition: ${shortcut.precondition}")
+        }
         return sb.toString()
     }
 
@@ -268,6 +263,25 @@ class Operator(private val finger: Finger) : BaseAgent() {
     }
 
 
+    data class ShortcutStep(
+        val name: String,
+        val argumentsMap: Map<String, String>
+    )
+
+    val initShortcuts = mapOf(
+        "Tap_Type_and_Enter" to Shortcut(
+            name = "Tap_Type_and_Enter",
+            arguments = listOf("x", "y", "text"),
+            description = "Tap an input box at (x, y), type the text, then press Enter.",
+            precondition = "Text input box is empty.",
+            atomicActionSequence = listOf(
+                ShortcutStep("Tap", mapOf("x" to "x", "y" to "y")),
+                ShortcutStep("Type", mapOf("text" to "text")),
+                ShortcutStep("Enter", emptyMap())
+            )
+        )
+    )
+
     fun execute(
         actionStr: String,
         infoPool: InfoPool,
@@ -323,7 +337,8 @@ class Operator(private val finger: Finger) : BaseAgent() {
         }
 
         // Execute shortcut
-        val shortcut = infoPool.shortcuts[name]
+// Execute shortcut (search in both initShortcuts and infoPool)
+        val shortcut = infoPool.shortcuts[name] ?: initShortcuts[name]
         if (shortcut != null) {
             println("Executing shortcut: $name")
             shortcut.atomicActionSequence.forEachIndexed { i, step ->
@@ -342,6 +357,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
             }
             return Triple(actionObj, shortcut.atomicActionSequence.size, null)
         }
+
 
         if (name.lowercase() in listOf("null", "none", "finish", "exit", "stop")) {
             println("Agent chose to finish the task. Action: $name")

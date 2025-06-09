@@ -46,10 +46,7 @@ class Retina(
         
         If similar items appear multiple times, distinguish them with spatial or visual cues (e.g., "top right icon", "blue button", "bottom search bar").
         
-        Make sure to add a magnifying glass and label it as search. It is generally used for search.
-        Only return the JSON array. Do not include any explanation, markdown, or code formatting.
-        Do not include text outside of the JSON array. Do not use markdown, do not wrap in code blocks, and do not use ellipsis. [Sometime when parsing time, it give json parse error, example 6:23am]
-    """.trimIndent()
+           """.trimIndent()
 
     private val boundingBoxSystemInstructionsv3 = """
         You are an expert at analyzing Android app screenshots. Your task is to extract clickable or recognizable UI elements such as:

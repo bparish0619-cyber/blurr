@@ -30,6 +30,7 @@ class Manager : BaseAgent() {
             1. "### Thought ###" — Explain your reasoning.
             2. "### Plan ###" — A list of numbered subgoals.
             3. "### Current Subgoal ###" — What should be executed now.
+            4. "### Notes ###" - Store any persistent knowledge, memory, or useful summary here. This will be saved.
         """.trimIndent()
 
         return listOf("user" to listOf(TextPart(systemPromptv2)))
@@ -71,17 +72,20 @@ class Manager : BaseAgent() {
             sb.appendLine("...\n")
             sb.appendLine("### Current Subgoal ###")
             sb.appendLine("The first subgoal you should work on.")
+            sb.appendLine("### Notes ###")
+            sb.appendLine("Store any persistent knowledge, memory, or useful summary here. This will be saved.")
+
         } else {
             sb.appendLine("### Current Plan ###")
             sb.appendLine(infoPool.plan)
             sb.appendLine()
             sb.appendLine("### Previous Subgoal ###")
             sb.appendLine(infoPool.currentSubgoal)
+//            sb.appendLine()
+//            sb.appendLine("### Progress Status ###")
+//            sb.appendLine(infoPool.progressStatus.ifEmpty { "No progress yet." })
             sb.appendLine()
-            sb.appendLine("### Progress Status ###")
-            sb.appendLine(infoPool.progressStatus.ifEmpty { "No progress yet." })
-            sb.appendLine()
-            sb.appendLine("### Important Notes ###")
+            sb.appendLine("### Notes ###")
             sb.appendLine(infoPool.importantNotes.ifEmpty { "No important notes recorded." })
             sb.appendLine()
 
@@ -119,19 +123,26 @@ class Manager : BaseAgent() {
     override fun parseResponse(response: String): Map<String, String> {
         val thought = extractSection(response, "### Thought ###", "### Plan ###")
         val plan = extractSection(response, "### Plan ###", "### Current Subgoal ###")
-        val currentSubgoal = extractSection(response, "### Current Subgoal ###", null)
+        val currentSubgoal = extractSection(response, "### Current Subgoal ###", "### Notes ###")
+        val notes = extractSection(response, "### Notes ###", null)
+
         return mapOf(
             "thought" to thought,
             "plan" to plan,
-            "current_subgoal" to currentSubgoal
+            "current_subgoal" to currentSubgoal,
+            "notes" to notes
         )
     }
 
     private fun extractSection(text: String, start: String, end: String?): String {
         val startIndex = text.indexOf(start)
         if (startIndex == -1) return ""
+
         val from = startIndex + start.length
         val to = end?.let { text.indexOf(it, from) } ?: text.length
+
+        if (to == -1 || from >= text.length || from > to) return ""
         return text.substring(from, to).trim()
     }
+
 }
