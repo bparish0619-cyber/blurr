@@ -44,6 +44,7 @@ val atomicActionSignatures = mapOf(
 
     "Open_App" to AtomicActionSignature(listOf("app_name")) { "If the current screen is Home or App screen, you can use this action to open the app named \\\"app_name\\\" on the visible on the current screen." }
 )
+
 data class Shortcut(
     val name: String,
     val arguments: List<String>,
@@ -56,47 +57,47 @@ data class Shortcut(
 class Operator(private val finger: Finger) : BaseAgent() {
 
     override fun initChat(): List<Pair<String, List<TextPart>>> {
-//        val systemPromptv1 = """
-//            You are a helpful AI assistant for operating mobile phones.
-//            Your goal is to choose the correct actions to complete the user's instruction.
-//            Think as if you are a human user operating the phone.
-//        """.trimIndent()
-
         val systemPrompt = """
-            You are a UI automation agent responsible for selecting and executing the next best action on a mobile phone screen.
-    
-            Your goal is to analyze the current screen context, understand the user’s goal, and choose a valid atomic action or shortcut that brings the user closer to their objective.
-            
-            ## NOTE ##
-            - If you need to tap the search bar or icon try looking for Magnifying Glass icon. Generally it is used for search.
-            - Make sure to add a magnifying glass and label it as search. It is generally used for search.
-            - Only return the JSON array. Do not include any explanation, markdown, or code formatting.
-            - Do not include text outside of the JSON array. Do not use markdown, do not wrap in code blocks, and do not use ellipsis. [Sometime when parsing time, it give json parse error, example 6:23am]
-
-            Guidelines:
-            - Think like a real user: imagine tapping, typing, swiping, or navigating based on what is visible on the screen.
-            - Instead taping every key when keyboard is open, use the Action Type.
-            - Only choose actions that are feasible given the visible UI elements.
-            - Use shortcuts when they are applicable to speed up common tasks.
-            - Use accurate pixel coordinates for actions such as 'Tap' or 'Swipe'.
-            - You may use available shortcuts, but you must ensure the preconditions are satisfied.
-            - Don't click on Logos, if you want search, just stick to the search bar/icons.
-            - If you see a keyboard on the screen, and your goals are to type, just start typing instead of enabling the input text box (Keyboard means the inputbox enabled)
-
-            Output format:
-            Return the action in strict JSON format:
-            {
-              "name": "ActionName",
-              "arguments": {
-                "arg1": value1,
-                "arg2": value2
-              }
-            }
-
-            Do not return any explanation or extra formatting (like Markdown code blocks)
-            BAD -> ```json{"name": "Tap", "arguments": {"x": 1356, "y": 89}}```
-            GOOD -> {"name": "Tap", "arguments": {"x": 1356, "y": 89}}
+            You are a helpful AI assistant for operating mobile phones.
+            Your goal is to choose the correct actions to complete the user's instruction.
+            Think as if you are a human user operating the phone.
         """.trimIndent()
+
+//        val systemPromptv2 = """
+//            You are a UI automation agent responsible for selecting and executing the next best action on a mobile phone screen.
+//
+//            Your goal is to analyze the current screen context, understand the user’s goal, and choose a valid atomic action or shortcut that brings the user closer to their objective.
+//
+//            ## NOTE ##
+//            - If you need to tap the search bar or icon try looking for Magnifying Glass icon. Generally it is used for search.
+//            - Make sure to add a magnifying glass and label it as search. It is generally used for search.
+//            - Only return the JSON array. Do not include any explanation, markdown, or code formatting.
+//            - Do not include text outside of the JSON array. Do not use markdown, do not wrap in code blocks, and do not use ellipsis. [Sometime when parsing time, it give json parse error, example 6:23am]
+//
+//            Guidelines:
+//            - Think like a real user: imagine tapping, typing, swiping, or navigating based on what is visible on the screen.
+//            - Instead taping every key when keyboard is open, use the Action Type.
+//            - Only choose actions that are feasible given the visible UI elements.
+//            - Use shortcuts when they are applicable to speed up common tasks.
+//            - Use accurate pixel coordinates for actions such as 'Tap' or 'Swipe'.
+//            - You may use available shortcuts, but you must ensure the preconditions are satisfied.
+//            - Don't click on Logos, if you want search, just stick to the search bar/icons.
+//            - If you see a keyboard on the screen, and your goals are to type, just start typing instead of enabling the input text box (Keyboard means the inputbox enabled)
+//
+//            Output format:
+//            Return the action in strict JSON format:
+//            {
+//              "name": "ActionName",
+//              "arguments": {
+//                "arg1": value1,
+//                "arg2": value2
+//              }
+//            }
+//
+//            Do not return any explanation or extra formatting (like Markdown code blocks)
+//            BAD -> ```json{"name": "Tap", "arguments": {"x": 1356, "y": 89}}```
+//            GOOD -> {"name": "Tap", "arguments": {"x": 1356, "y": 89}}
+//        """.trimIndent()
 
         return listOf("user" to listOf(TextPart(systemPrompt)))
     }
@@ -137,6 +138,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
             }
             sb.appendLine()
         }
+
         sb.appendLine("Note that a search bar is often a long, rounded rectangle. If no search bar is presented and you want to perform a search, you may need to tap a search button, which is commonly represented by a magnifying glass.\n")
         sb.appendLine("Also, the information above might not be entirely accurate. ")
         sb.appendLine("You should combine it with the screenshot to gain a better understanding.")
@@ -178,8 +180,9 @@ class Operator(private val finger: Finger) : BaseAgent() {
         sb.appendLine("The shortcut functions are listed in the format of `name(arguments): description | Precondition: precondition` as follows:\n")
 
         (infoPool.shortcuts).forEach { (name, shortcut) ->
-            sb.appendLine("- ${shortcut.name}(${shortcut.arguments.joinToString()}): ${shortcut.description} | Precondition: ${shortcut.precondition}")
+            sb.appendLine("- ${name}(${shortcut.arguments.joinToString()}): ${shortcut.description} | Precondition: ${shortcut.precondition}")
         }
+
         if (infoPool.shortcuts.isEmpty()) {
             sb.appendLine("No shortcuts available.")
         }
@@ -188,41 +191,43 @@ class Operator(private val finger: Finger) : BaseAgent() {
         if (infoPool.actionHistory.isNotEmpty()){
             sb.appendLine("Recent actions you took previously and whether they were successful:\n")
             val numOfActions = min(5, infoPool.actionHistory.size)
-//            latest_actions = info_pool.action_history[-num_actions:]
-//            latest_summary = info_pool.summary_history[-num_actions:]
-//            latest_outcomes = info_pool.action_outcomes[-num_actions:]
-//            error_descriptions = info_pool.error_descriptions[-num_actions:]
-//            action_log_strs = []
-//            for act, summ, outcome, err_des in zip(latest_actions, latest_summary, latest_outcomes, error_descriptions):
-//            if outcome == "A":
-//            action_log_str = f"Action: {act} | Description: {summ} | Outcome: Successful\n"
-//            else:
-//            action_log_str = f"Action: {act} | Description: {summ} | Outcome: Failed | Feedback: {err_des}\n"
-//            prompt += action_log_str
-//            action_log_strs.append(action_log_str)
-//            if latest_outcomes[-1] == "C" and "Tap" in action_log_strs[-1] and "Tap" in action_log_strs[-2]:
-//            prompt += "\nHINT: If multiple Tap actions failed to make changes to the screen, consider using a \"Swipe\" action to view more content or use another way to achieve the current subgoal."
-//
-//            prompt += "\n"
             val latestActions = infoPool.actionHistory.takeLast(numOfActions)
             val latestSummaries = infoPool.summaryHistory.takeLast(numOfActions)
             val latestOutcomes = infoPool.actionOutcomes.takeLast(numOfActions)
             val latestErrorDescriptions = infoPool.errorDescriptions.takeLast(numOfActions)
             val actionLogStrs = mutableListOf<String>()
             for (i in latestActions.indices) {
-                if (latestOutcomes[i] == "A") {
-                    sb.appendLine("- Action: ${latestActions[i]} | Description: ${latestSummaries[i]} | Outcome: Successful")
-                }
-                else {
-                    sb.appendLine("- Action: ${latestActions[i]} | Description: ${latestSummaries[i]} | Outcome: Failed | Feedback: ${latestErrorDescriptions[i]}")
+
+                val actionLogString: String = if (latestOutcomes[i] == "A") {
+                    ("- Action: ${latestActions[i]} | Description: ${latestSummaries[i]} | Outcome: Successful")
+                } else {
+                    ("- Action: ${latestActions[i]} | Description: ${latestSummaries[i]} | Outcome: Failed | Feedback: ${latestErrorDescriptions[i]}")
                 }
 
+                sb.appendLine(actionLogString)
+                actionLogStrs.add(actionLogString)
             }
-
+            if (latestOutcomes.last() == "C" && "Tap" in actionLogStrs[actionLogStrs.size - 1] && "Tap" in actionLogStrs[actionLogStrs.size - 2]) {
+                sb.appendLine(" \nHINT: If multiple Tap actions failed to make changes to the screen, consider using a \\\"Swipe\\\" action to view more content or use another way to achieve the current subgoal.\n")
+            }
+        }
+        else {
+            sb.appendLine("\nNo actions have been taken yet.\n")
         }
 
+        sb.appendLine("---\n")
+        sb.appendLine("Provide your output in the following format, which contains three parts:\n")
 
-//        sb.appendLine("Format: valid JSON {\"name\": \"ActionName\", \"arguments\": {key: value}}")
+        sb.appendLine("### Thought ###\n")
+        sb.appendLine("Provide a detailed explanation of your rationale for the chosen action. IMPORTANT: If you decide to use a shortcut, first verify that its precondition is met in the current phone state. For example, if the shortcut requires the phone to be at the Home screen, check whether the current screenshot shows the Home screen. If not, perform the appropriate atomic actions instead.\n\n")
+
+        sb.appendLine("### Action ###\n")
+        sb.appendLine("Choose only one action or shortcut from the options provided. IMPORTANT: Do NOT return invalid actions like null or stop. Do NOT repeat previously failed actions.\n")
+        sb.appendLine("Use shortcuts whenever possible to expedite the process, but make sure that the precondition is met.\n")
+        sb.appendLine("You must provide your decision using a valid JSON format specifying the name and arguments of the action. For example, if you choose to tap at position (100, 200), you should write {\"name\":\"Tap\", \"arguments\":{\"x\":100, \"y\":100}}. If an action does not require arguments, such as Home, fill in null to the \"arguments\" field. Ensure that the argument keys match the action function's signature exactly.\n\n")
+
+        sb.appendLine("### Description ###\n")
+        sb.appendLine("A brief description of the chosen action and the expected outcome.")
 
         return sb.toString()
     }
@@ -340,81 +345,94 @@ class Operator(private val finger: Finger) : BaseAgent() {
         actionStr: String,
         infoPool: InfoPool,
         context: Context,
-        extraArgs: Map<String, Any?> = emptyMap()
     ): Triple<Map<String, Any>?, Int, String?> {
+
         val actionObj = try {
+            var cleanedActionStr = actionStr.lines().filterNot { it.trim().startsWith("#") }.joinToString("\n")
+            cleanedActionStr = cleanedActionStr.lines().filterNot { it.trim().startsWith("//") }.joinToString("\n")
 
-            val json = org.json.JSONObject(actionStr)
-
+            val json = org.json.JSONObject(cleanedActionStr)
             val name = json.getString("name")
-
             val arguments = json.optJSONObject("arguments")?.let {
                 it.keys().asSequence().associateWith { key -> it.get(key) }
             } ?: emptyMap()
             mapOf("name" to name, "arguments" to arguments)
         } catch (e: Exception) {
             println("Invalid JSON for executing action: $actionStr")
-            return Triple(null, 0, null)
+            return Triple(null, 0, "Invalid JSON format: ${e.message}")
         }
 
         val name = (actionObj["name"] as String).trim()
         val arguments = actionObj["arguments"] as Map<*, *>
+        val shortcut = infoPool.shortcuts[name]
 
         // Execute atomic action
         if (atomicActionSignatures.containsKey(name)) {
             if (name.equals("Open_App", ignoreCase = true)) {
                 val appName = arguments["app_name"]?.toString()?.trim() ?: return Triple(null, 0, "Missing app_name")
-                val textBlocks = extraArgs["textBlocks"] as? List<String> ?: return Triple(null, 0, "Missing textBlocks")
-                val coords = extraArgs["coordinates"] as? List<List<Int>> ?: return Triple(null, 0, "Missing coordinates")
-
-                for (i in textBlocks.indices) {
-                    if (textBlocks[i] == appName) {
-                        val box = coords[i]
-                        val centerX = (box[0] + box[2]) / 2
-                        val centerY = (box[1] + box[3]) / 2 - (box[3] - box[1])
-                        finger.tap(centerX, centerY)
-                        break
+                infoPool.perceptionInfosPre.forEach { clickableInfo ->
+                    if (clickableInfo.text.lowercase() == appName.lowercase()) {
+                        val tapArgs = mapOf(
+                            "x" to clickableInfo.coordinates.first,
+                            "y" to clickableInfo.coordinates.second
+                        )
+                        executeAtomicAction("Tap", tapArgs, context)
+                        logActionOnScreenshot("Tap", tapArgs, context)
+                        return Triple(actionObj, 1, null)
+                }
+                    if (appName in listOf("Fandango", "Walmart", "Best Buy")) {
+                        Thread.sleep(10000)
                     }
                 }
-//                if (appName in listOf("Fandango", "Walmart", "Best Buy")) {
-//                    Thread.sleep(10000)
-//                }
-//                Thread.sleep(10000)
+                Thread.sleep(10000)
             } else {
                 executeAtomicAction(name, arguments, context)
                 logActionOnScreenshot(name, arguments, context)
             }
             return Triple(actionObj, 1, null)
         }
-
-        // Execute shortcut
-// Execute shortcut (search in both initShortcuts and infoPool)
-        val shortcut = infoPool.shortcuts[name] ?: initShortcuts[name]
-        if (shortcut != null) {
+        // Execute shortcut (search in both initShortcuts and infoPool)
+        else if (shortcut != null) {
             println("Executing shortcut: $name")
-            shortcut.atomicActionSequence.forEachIndexed { i, step ->
-                try {
-                    val atomicArgs = step.argumentsMap.mapValues { (_, mappedKey) ->
-                        arguments[mappedKey] ?: mappedKey
+            try {
+                shortcut.atomicActionSequence.forEachIndexed { i, atomicAction ->
+                    val atomicActionName = atomicAction.name
+                    val atomicActionArgs = mutableMapOf<String, Any?>()
+
+                    if (atomicAction.argumentsMap.isNotEmpty()) {
+                        atomicAction.argumentsMap.forEach { (atomicArgKey, value) ->
+                            if (arguments.containsKey(value)) { // if the mapped key is in the shortcut arguments
+                                atomicActionArgs[atomicArgKey] = arguments[value]
+                            } else { // if not: the values are directly passed
+                                atomicActionArgs[atomicArgKey] = value
+                            }
+                        }
                     }
-                    println("\t Executing sub-step $i: ${step.name}, $atomicArgs")
-                    executeAtomicAction(step.name, atomicArgs, context)
-                } catch (e: Exception) {
-                    val errorMsg = "${e.message} in executing step $i: ${step.name} $arguments"
-                    println("Error in shortcut: $name: $errorMsg")
-                    return Triple(actionObj, i, errorMsg)
+
+                    println("\t Executing sub-step $i: $atomicActionName $atomicActionArgs ...")
+                    executeAtomicAction(atomicActionName, atomicActionArgs, context)
+
+                    logActionOnScreenshot(atomicActionName, atomicActionArgs, context)
+                    val eyes = Eyes(context)
+                    eyes.openEyes()
+                    Thread.sleep(800)
                 }
+                return Triple(actionObj, shortcut.atomicActionSequence.size, null)
+            } catch (e: Exception) {
+                println("Error in executing shortcut: $name, ${e.message}")
+                return Triple(actionObj, shortcut.atomicActionSequence.indexOfFirst { it.name == e.message?.substringAfterLast(": ")?.substringBefore(" ") }, e.message) // This is a rough way to get the step index
             }
-            return Triple(actionObj, shortcut.atomicActionSequence.size, null)
+        }
+        else {
+            if (name.lowercase() in listOf("null", "none", "finish", "exit", "stop")) {
+                println("Agent chose to finish the task. Action: $name")
+            } else {
+                println("Error! Invalid action name: $name")
+            }
         }
 
-
-        if (name.lowercase() in listOf("null", "none", "finish", "exit", "stop")) {
-            println("Agent chose to finish the task. Action: $name")
-        } else {
-            println("Error! Invalid action name: $name")
-        }
         infoPool.finishThought = infoPool.lastActionThought
+
         return Triple(null, 0, null)
     }
 

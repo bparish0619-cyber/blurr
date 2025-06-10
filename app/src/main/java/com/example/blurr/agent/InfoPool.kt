@@ -35,6 +35,7 @@ data class InfoPool(
     var prevSubgoal: String = "",
     var errToManagerThresh: Int = 2,
     var keyboardPre: Boolean = false,
+    var keyboardPost: Boolean = false,
 
     var futureTasks: MutableList<String> = mutableListOf()
 )
