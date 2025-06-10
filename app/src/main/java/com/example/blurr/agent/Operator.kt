@@ -131,10 +131,6 @@ class Operator(private val finger: Finger) : BaseAgent() {
 //        sb.appendLine("### Keyboard status ###")
 //        sb.appendLine(if (infoPool.keyboardPre) "Keyboard is active." else "Keyboard is not active.")
 
-        if (infoPool.tips.isNotBlank()) {
-            sb.appendLine("\n### Tips ###")
-            sb.appendLine(infoPool.tips)
-        }
 
         if (infoPool.importantNotes.isNotBlank()) {
             sb.appendLine("\n### Important Notes ###")
@@ -285,9 +281,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
     fun execute(
         actionStr: String,
         infoPool: InfoPool,
-        screenshotLogger: ((String) -> Unit)? = null,
         context: Context,
-        iter: String = "",
         extraArgs: Map<String, Any?> = emptyMap()
     ): Triple<Map<String, Any>?, Int, String?> {
         val actionObj = try {
@@ -332,7 +326,6 @@ class Operator(private val finger: Finger) : BaseAgent() {
                 executeAtomicAction(name, arguments, context)
                 logActionOnScreenshot(name, arguments, context)
             }
-            screenshotLogger?.invoke("${iter}__${name.replace(" ", "")}.png")
             return Triple(actionObj, 1, null)
         }
 
@@ -348,7 +341,6 @@ class Operator(private val finger: Finger) : BaseAgent() {
                     }
                     println("\t Executing sub-step $i: ${step.name}, $atomicArgs")
                     executeAtomicAction(step.name, atomicArgs, context)
-                    screenshotLogger?.invoke("${iter}__${name.replace(" ", "")}__${i}-${step.name.replace(" ", "")}.png")
                 } catch (e: Exception) {
                     val errorMsg = "${e.message} in executing step $i: ${step.name} $arguments"
                     println("Error in shortcut: $name: $errorMsg")

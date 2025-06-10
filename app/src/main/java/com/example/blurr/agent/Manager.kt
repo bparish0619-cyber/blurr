@@ -5,11 +5,7 @@ import com.google.ai.client.generativeai.type.TextPart
 class Manager : BaseAgent() {
 
     override fun initChat(): List<Pair<String, List<TextPart>>> {
-        val systemPromptv1 = """
-            You are a helpful AI assistant for operating mobile phones. 
-            Your goal is to track progress and devise high-level plans to achieve the user's requests. 
-            Think as if you are a human user operating the phone.
-        """.trimIndent()
+
         val systemPromptv2 = """
             You are a strategic planner and intelligent assistant designed to operate a mobile phone like a highly capable user.
             
@@ -25,12 +21,6 @@ class Manager : BaseAgent() {
             - If you see a keyboard on the screen, and your goals are to type, just start typing instead of enabling the input text box (Keyboard means the inputbox enabled)
             - Leverage any past shortcuts or user experience if relevant.
             - for search use chrome
-        
-            Your output must follow the format:
-            1. "### Thought ###" — Explain your reasoning.
-            2. "### Plan ###" — A list of numbered subgoals.
-            3. "### Current Subgoal ###" — What should be executed now.
-            4. "### Notes ###" - Store any persistent knowledge, memory, or useful summary here. This will be saved.
         """.trimIndent()
 
         return listOf("user" to listOf(TextPart(systemPromptv2)))
@@ -71,9 +61,7 @@ class Manager : BaseAgent() {
             sb.appendLine("2. second subgoal")
             sb.appendLine("...\n")
             sb.appendLine("### Current Subgoal ###")
-            sb.appendLine("The first subgoal you should work on.")
-            sb.appendLine("### Notes ###")
-            sb.appendLine("Store any persistent knowledge, memory, or useful summary here. This will be saved.")
+            sb.appendLine("The first subgoal you should work on.\n")
 
         } else {
             sb.appendLine("### Current Plan ###")
@@ -85,9 +73,13 @@ class Manager : BaseAgent() {
 //            sb.appendLine("### Progress Status ###")
 //            sb.appendLine(infoPool.progressStatus.ifEmpty { "No progress yet." })
             sb.appendLine()
-            sb.appendLine("### Notes ###")
-            sb.appendLine(infoPool.importantNotes.ifEmpty { "No important notes recorded." })
+            sb.appendLine("The sections above provide an overview of the plan you are following, the current subgoal you are working on, the overall progress made, and any important notes you have recorded. The screenshot displays the current state of the phone.\n")
             sb.appendLine()
+            sb.appendLine("Carefully assess the current status to determine if the task has been fully completed. If the user's request involves exploration, ensure you have conducted sufficient investigation. If you are confident that no further actions are required, mark the task as \"Finished\" in your output. If the task is not finished, outline the next steps. If you are stuck with errors, think step by step about whether the overall plan needs to be revised to address the error.\n")
+            sb.appendLine()
+            sb.appendLine("NOTE: If the current situation prevents proceeding with the original plan or requires clarification from the user, make reasonable assumptions and revise the plan accordingly. Act as though you are the user in such cases.\n\n")
+            sb.appendLine()
+
 
             if (infoPool.errorFlagPlan) {
                 sb.appendLine("### Potentially Stuck! ###")
@@ -123,14 +115,12 @@ class Manager : BaseAgent() {
     override fun parseResponse(response: String): Map<String, String> {
         val thought = extractSection(response, "### Thought ###", "### Plan ###")
         val plan = extractSection(response, "### Plan ###", "### Current Subgoal ###")
-        val currentSubgoal = extractSection(response, "### Current Subgoal ###", "### Notes ###")
-        val notes = extractSection(response, "### Notes ###", null)
+        val currentSubgoal = extractSection(response, "### Current Subgoal ###", null)
 
         return mapOf(
             "thought" to thought,
             "plan" to plan,
             "current_subgoal" to currentSubgoal,
-            "notes" to notes
         )
     }
 

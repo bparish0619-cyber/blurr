@@ -7,15 +7,12 @@ data class ClickableInfo(
 
 data class InfoPool(
     var instruction: String = "",
-    var tips: String = "",
     var shortcuts: MutableMap<String, Shortcut> = mutableMapOf(),
 
     var width: Int = 1080,
     var height: Int = 2340,
     var perceptionInfosPre: MutableList<ClickableInfo> = mutableListOf(),
-    var keyboardPre: Boolean = false,
     var perceptionInfosPost: MutableList<ClickableInfo> = mutableListOf(),
-    var keyboardPost: Boolean = false,
 
     var summaryHistory: MutableList<String> = mutableListOf(),
     var actionHistory: MutableList<String> = mutableListOf(),

@@ -32,12 +32,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var showLogsButton: Button
     private lateinit var inputField: EditText
     private lateinit var performTaskButton: TextView
-    private lateinit var screenshotFile: File
 
-    private val handler = Handler(Looper.getMainLooper())
-    private val interval: Long = 3000L // 3 seconds
     private val logs = mutableListOf<String>()
-    private val dateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,62 +64,10 @@ class MainActivity : AppCompatActivity() {
             "❌ No root access!"
         }
 
-        if (hasRoot == true) {
-            screenshotFile = File(filesDir, "latest.png")
-
-            handler.post(screenshotAndTapTask)
-
-            if (screenshotFile.exists()) {
-                val bitmap = BitmapFactory.decodeFile(screenshotFile.absolutePath)
-                screenshotView.setImageBitmap(bitmap)
-            }
-        }
     }
 
-    private val screenshotAndTapTask = object : Runnable {
-        override fun run() {
-//            performRandomTap()
-//            println("App is running")
-            handler.postDelayed(this, interval)
-        }
-    }
-
-    private fun takeScreenshot() {
-        val output = screenshotFile.absolutePath
-        val timestamp = dateFormat.format(Date())
-
-        CoroutineScope(Dispatchers.IO).launch {
-            Shell.cmd("screencap -p $output").exec()
-            if (screenshotFile.exists()) {
-                val bitmap = BitmapFactory.decodeFile(output)
-                withContext(Dispatchers.Main) {
-                    screenshotView.setImageBitmap(bitmap)
-                    val log = "🖼️ Screenshot at $timestamp"
-                    statusText.text = log
-                    logs.add(log)
-                }
-            }
-        }
-    }
-
-    private fun performRandomTap() {
-        val randomX = Random.nextInt(100, 900)
-        val randomY = Random.nextInt(300, 1600)
-        val timestamp = dateFormat.format(Date())
-
-        CoroutineScope(Dispatchers.IO).launch {
-            val finger = Finger()
-            // finger.tap(randomX, randomY)
-
-            withContext(Dispatchers.Main) {
-                val log = "👆 Tap at ($randomX, $randomY) at $timestamp"
-                statusText.text = log
-                logs.add(log)
-            }
-        }
-    }
-    fun writeToFile(file: File, content: String) {
-        file.printWriter().use { out -> out.println(content) }
+    fun appendToFile(file: File, content: String) {
+        file.appendText(content + "\n")
     }
 
 
@@ -141,22 +85,17 @@ class MainActivity : AppCompatActivity() {
             val infoPool = InfoPool(inputText) // Assuming constructor exists
 
             var iteration = 0
-            var lastScreenshotFile: File? = null
             val maxItr = 20
-            val maxConsecutiveFailures = 3
-            val maxRepetitiveActions = 3
-            val steps = mutableListOf<JSONObject>()
 
             val managerPromptFile = File(logDir, "manager_prompt_$.txt")
             val managerOutputFile = File(logDir, "manager_output_$.txt")
             val operatorPromptFile = File(logDir, "operator_prompt_$.txt")
             val operatorOutputFile = File(logDir, "operator_output_$.txt")
+            val reflectorOutputFile = File(logDir, "reflector_output_$.txt")
+            val reflectorPromptFile = File(logDir, "reflector_output_$.txt")
 
             while (iteration < maxItr) {
-
-
                 iteration++
-//                Thread.sleep(10000)
                 // Step 1: Take Perception
                 val screenshotFile = eyes.getScreenshotFile()
                 val screenshotPath = File(screenshotsDir, "screenshot.jpg")
@@ -166,41 +105,56 @@ class MainActivity : AppCompatActivity() {
                 infoPool.height = height
                 infoPool.perceptionInfosPre = perceptionInfos as MutableList<ClickableInfo>
 
-
-
                 // Step 2: Manager Planning
                 val manager = Manager()
                 val promptPlan = manager.getPrompt(infoPool)
                 val chatPlan = manager.initChat()
-                writeToFile(managerPromptFile, promptPlan+ timestamp)
-                writeToFile(managerPromptFile, chatPlan[0].second[0].text+ timestamp)
                 val combinedChatPlan  = addResponse("user",promptPlan, chatPlan, screenshotFile )
-                val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
 
+                // Logging the State
+                appendToFile(managerPromptFile, promptPlan+ timestamp)
+                appendToFile(managerPromptFile, chatPlan[0].second[0].text+ timestamp)
+
+                // Request to Gemini
+                val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
                 val parsedManagerPlan = manager.parseResponse(outputPlan)
+
+                // Updating the InfoPool
                 infoPool.plan = parsedManagerPlan["plan"].toString()
                 infoPool.currentSubgoal =  parsedManagerPlan["current_subgoal"].toString()
                 infoPool.lastActionThought = parsedManagerPlan["thought"].toString()
                 infoPool.lastSummary = infoPool.lastActionThought
-                infoPool.importantNotes = parsedManagerPlan["notes"].toString()
+
                 println(parsedManagerPlan)
-                writeToFile(managerOutputFile, parsedManagerPlan.toString()+ timestamp)
+
+                // Logging the State
+                appendToFile(managerOutputFile, parsedManagerPlan.toString()+ timestamp)
 
                 // Step 3 Operator's turn, he will execute on the plan of manager
                 val operator = Operator(finger)
                 val actionPrompt = operator.getPrompt(infoPool)
                 val actionChat = operator.initChat()
-                writeToFile(operatorPromptFile, actionPrompt+ timestamp)
-                writeToFile(operatorPromptFile, actionChat[0].second[0].toString()+ timestamp)
-
                 val actionCombinedChat  = addResponse("user",actionPrompt, actionChat, screenshotPath )
+
+                // Logging the State
+                appendToFile(operatorPromptFile, actionPrompt+ timestamp)
+                appendToFile(operatorPromptFile, actionChat[0].second[0].toString()+ timestamp)
+
+                // Request to Gemini
                 var actionOutput = getReasoningModelApiResponse(actionCombinedChat, apiKey = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
+
+                // Updating the infopool
+                infoPool.lastAction = actionOutput
+
+                // Updating the InfoPool
                 infoPool.actionHistory.add(actionOutput + infoPool.currentSubgoal)
+
                 println("ACTION OUTPUT :::: $actionOutput")
-                writeToFile(operatorOutputFile, actionOutput + timestamp)
-                val screenshotLogger: (String) -> Unit = { filename ->
-                    println("Saving screenshot: $filename")
-                }
+
+                // Logging the State
+                appendToFile(operatorOutputFile, actionOutput + timestamp)
+
+                // Sanitizing the Output
                 if (actionOutput.startsWith("```json")){
                     actionOutput = actionOutput
                         .replace(Regex("^```(?:json)?\\s*"), "") // remove opening code block
@@ -211,51 +165,45 @@ class MainActivity : AppCompatActivity() {
                 // THE EXECUTION HAPPEN HERE
                 if(actionOutput != "") {
                     val result = operator.execute(
-                        actionOutput.toString(), infoPool, screenshotLogger, context
+                        actionOutput.toString(), infoPool, context
                     )
                 }
 
 
-            //          NOTE:  ONLY FOR REMEMBER TO ADD THEM BY REFLECTOR
-            //            if (infoPool.errorFlagPlan) {
-//                sb.appendLine("### Potentially Stuck! ###")
-//                val k = infoPool.errToManagerThresh
-//                val lastActions = infoPool.actionHistory.takeLast(k)
-//                val lastSummaries = infoPool.summaryHistory.takeLast(k)
-//                val lastErrors = infoPool.errorDescriptions.takeLast(k)
-//                for (i in lastActions.indices) {
-//                    sb.appendLine("- Attempt: Action: ${lastActions[i]} | Description: ${lastSummaries[i]} | Outcome: Failed | Feedback: ${lastErrors[i]}")
-//                }
-//            }
-                //          NOTE:  ONLY FOR REMEMBER TO ADD THEM BY REFLECTOR
+//                 Step 4 : Take the Perception after the action by operator has been performed
+                val postScreenshotFile = eyes.getScreenshotFile()
+                postScreenshotFile.copyTo(screenshotPath, overwrite = true)
+                val (postPerceptionInfos, _, _) = retina.getPerceptionInfos(context)
+                infoPool.perceptionInfosPost = postPerceptionInfos as MutableList<ClickableInfo>
 
-                // Step 4 : Take the Perception after the action by operator has been performed
-//                infoPool.lastAction = actionOutput
-//                val postScreenshotFile = eyes.getScreenshotFile()
-//                postScreenshotFile.copyTo(screenshotPath, overwrite = true)
-//                val (postPerceptionInfos, _, _) = retina.getPerceptionInfos(context)
-//                infoPool.perceptionInfosPost = postPerceptionInfos as MutableList<ClickableInfo>
-//
-//
-//                val actionReflector = ActionReflector()
-//                val reflectionPrompt = actionReflector.getPrompt(infoPool)
-////                println("reflection prompt : $reflectionPrompt")
-//                val reflectionChat = actionReflector.initChat()
-//
-//                val reflectionCombinedChat  = addResponsePrePost("user",reflectionPrompt, reflectionChat, screenshotFile, postScreenshotFile )
-////                println("combined: $reflectionCombinedChat")
-//                val reflectionLLMOutput = getReasoningModelApiResponse(reflectionCombinedChat, apiKey = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
-//                val parsedReflection = actionReflector.parseResponse(reflectionLLMOutput)
-//                println("Parsed LLM Output $parsedReflection")
-////                break
-//
-////
-//                infoPool.progressStatusHistory.add(parsedReflection["progress_status"].toString())
-//                infoPool.actionHistory.add(actionOutput)
-//                infoPool.summaryHistory.add(actionOutput)
-//                infoPool.actionOutcomes.add(parsedReflection["outcome"].toString())
-//                infoPool.errorDescriptions.add(parsedReflection["error_description"].toString())
-//                infoPool.progressStatus = parsedReflection["progress_status"].toString()
+
+//                Step5 The Reflector of our actions
+                val actionReflector = ActionReflector()
+                val reflectionPrompt = actionReflector.getPrompt(infoPool)
+                val reflectionChat = actionReflector.initChat()
+                val reflectionCombinedChat  = addResponsePrePost("user",reflectionPrompt, reflectionChat, screenshotFile, postScreenshotFile )
+
+                // Logging the State
+                appendToFile(reflectorPromptFile, reflectionPrompt+ timestamp)
+                appendToFile(reflectorPromptFile, reflectionChat[0].second[0].toString()+ timestamp)
+
+
+                // Sending to the GEMINI
+                val reflectionLLMOutput = getReasoningModelApiResponse(reflectionCombinedChat, apiKey = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
+                val parsedReflection = actionReflector.parseResponse(reflectionLLMOutput)
+                println("Parsed LLM Output $parsedReflection")
+//                break
+
+                // Logging the State
+                appendToFile(reflectorOutputFile, parsedReflection.toString()+ timestamp)
+
+//              Updating the InfoPool
+                infoPool.progressStatusHistory.add(parsedReflection["progress_status"].toString())
+                infoPool.actionHistory.add(actionOutput)
+                infoPool.summaryHistory.add(actionOutput)
+                infoPool.actionOutcomes.add(parsedReflection["outcome"].toString())
+                infoPool.errorDescriptions.add(parsedReflection["error_description"].toString())
+                infoPool.progressStatus = parsedReflection["progress_status"].toString()
 //                // Step 7: Delay before next step
                 Thread.sleep(150)
             }
@@ -265,6 +213,5 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        handler.removeCallbacks(screenshotAndTapTask)
     }
 }
