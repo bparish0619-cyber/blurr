@@ -3,18 +3,16 @@ package com.example.blurr.agent
 import android.content.Context
 import com.example.blurr.service.Eyes
 import com.example.blurr.service.Finger
-import com.google.ai.client.generativeai.type.Content
 import com.google.ai.client.generativeai.type.TextPart
 import java.io.File
-import java.util.concurrent.TimeUnit
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import androidx.compose.runtime.currentComposer
 import com.example.blurr.agent.Operator.ShortcutStep
 import java.io.FileOutputStream
+import kotlin.math.min
 
 data class AtomicActionSignature(
     val arguments: List<String>,
@@ -23,22 +21,28 @@ data class AtomicActionSignature(
 
 val atomicActionSignatures = mapOf(
     "Tap" to AtomicActionSignature(
-        listOf("x", "y"),
-        { "Tap the position (x, y) in current screen." }
-    ),
+        listOf("x", "y")
+    ) { "Tap the position (x, y) in current screen." },
+
     "Swipe" to AtomicActionSignature(
-        listOf("x1", "y1", "x2", "y2"),
-        { info -> "Swipe from (x1, y1) to (x2, y2). E.g., swipe up: x1 = x2 = ${(info.width * 0.5).toInt()}, y1 = ${(info.height * 0.5).toInt()}, y2 = ${(info.height * 0.1).toInt()}." }
-    ),
+        listOf("x1", "y1", "x2", "y2")
+    ) { info -> "Swipe from position (x1, y1) to position (x2, y2). To swipe up or down to review more content, you can adjust the y-coordinate offset based on the desired scroll distance. For example, setting x1 = x2 = ${(0.5 * info.width)}, y1 = ${(0.5 * info.height)}, and y2 = ${(0.1 * info.height)} will swipe upwards to review additional content below. To swipe left or right in the App switcher screen to choose between open apps, set the x-coordinate offset to at least ${(0.5 * info.width)}." },
+
     "Type" to AtomicActionSignature(
-        listOf("text"),
-        { "Type the \"text\" in an input box. You dont need to type everything on keyboard 1 by 1, this is fast" }
-    ),
+        listOf("text")
+    ) { "Type the \"text\" in an input box. You dont need to type everything on keyboard 1 by 1, this is fast" },
+
     "Enter" to AtomicActionSignature(emptyList()) { "Press the Enter key after typing." },
+
     "Switch_App" to AtomicActionSignature(emptyList()) { "Show the App switcher." },
-    "Back" to AtomicActionSignature(emptyList()) { "Go back to the previous screen." },
-    "Home" to AtomicActionSignature(emptyList()) { "Go to the home screen." },
-    "Wait" to AtomicActionSignature(emptyList()) { "Wait for 10 seconds." }
+
+    "Back" to AtomicActionSignature(emptyList()) { "Go back to the previous state." },
+
+    "Home" to AtomicActionSignature(emptyList()) { "Go to the home page." },
+
+    "Wait" to AtomicActionSignature(emptyList()) { "Wait for 10 seconds to give more time for a page loading" },
+
+    "Open_App" to AtomicActionSignature(listOf("app_name")) { "If the current screen is Home or App screen, you can use this action to open the app named \\\"app_name\\\" on the visible on the current screen." }
 )
 data class Shortcut(
     val name: String,
@@ -52,11 +56,11 @@ data class Shortcut(
 class Operator(private val finger: Finger) : BaseAgent() {
 
     override fun initChat(): List<Pair<String, List<TextPart>>> {
-        val systemPromptv1 = """
-            You are a helpful AI assistant for operating mobile phones. 
-            Your goal is to choose the correct actions to complete the user's instruction. 
-            Think as if you are a human user operating the phone.
-        """.trimIndent()
+//        val systemPromptv1 = """
+//            You are a helpful AI assistant for operating mobile phones.
+//            Your goal is to choose the correct actions to complete the user's instruction.
+//            Think as if you are a human user operating the phone.
+//        """.trimIndent()
 
         val systemPrompt = """
             You are a UI automation agent responsible for selecting and executing the next best action on a mobile phone screen.
@@ -106,66 +110,120 @@ class Operator(private val finger: Finger) : BaseAgent() {
         sb.appendLine("### Overall Plan ###")
         sb.appendLine(infoPool.plan)
         sb.appendLine()
-//        NOTE: Uncomment this ASAP
-//        sb.appendLine("### Progress Status ###")
-//        sb.appendLine(infoPool.progressStatus.ifEmpty { "No progress yet." })
-//        sb.appendLine()
+
+        sb.appendLine("### Progress Status ###")
+        sb.appendLine(infoPool.progressStatus.ifEmpty { "No progress yet." })
+        sb.appendLine()
 
         sb.appendLine("### Current Subgoal ###")
         sb.appendLine(infoPool.currentSubgoal)
-        println("CURRENT SUBGOAL : ${infoPool.currentSubgoal}")
         sb.appendLine()
 
         sb.appendLine("### Screen Information ###")
-        sb.appendLine("Width: ${infoPool.width}, Height: ${infoPool.height}")
+        sb.appendLine("The attached image is a screenshot showing the current state of the phone. ")
+        sb.appendLine("Its width and height are ${infoPool.width} and ${infoPool.height} pixels, respectively.\n")
         sb.appendLine()
+
+
+        sb.appendLine("To help you better understand the content in this screenshot, we have extracted positional information for the text elements and icons, including interactive elements such as search bars. ")
+        sb.appendLine("The format is: (coordinates; content). The coordinates are [x, y], where x represents the horizontal pixel position (from left to right) ")
+        sb.appendLine("and y represents the vertical pixel position (from top to bottom).")
+
+        sb.appendLine("\nThe extracted information is as follows:\n")
+
         if (infoPool.perceptionInfosPre.isNotEmpty()) {
-            sb.appendLine("### Visible Screen Elements ###")
-            sb.appendLine("The following UI elements are currently visible on the screen:")
             infoPool.perceptionInfosPre.forEach { element ->
-                sb.appendLine("- Text: \"${element.text}\" at position ${element.coordinates}")
+                sb.appendLine("- Element \"${element.text}\" at position ${element.coordinates}")
             }
             sb.appendLine()
         }
-        sb.appendLine()
-//        sb.appendLine("### Keyboard status ###")
-//        sb.appendLine(if (infoPool.keyboardPre) "Keyboard is active." else "Keyboard is not active.")
+        sb.appendLine("Note that a search bar is often a long, rounded rectangle. If no search bar is presented and you want to perform a search, you may need to tap a search button, which is commonly represented by a magnifying glass.\n")
+        sb.appendLine("Also, the information above might not be entirely accurate. ")
+        sb.appendLine("You should combine it with the screenshot to gain a better understanding.")
 
+        sb.appendLine("\n")
+        sb.appendLine("### Keyboard status ###")
+        sb.appendLine(if (infoPool.keyboardPre) "The keyboard has been activated and you can type." else "The keyboard has not been activated and you can\\'t type.")
+        sb.appendLine("\n")
+
+        if (infoPool.tips.isNotEmpty()){
+            sb.appendLine("### Tips ###")
+            sb.appendLine("From previous experience interacting with the device, you have collected the following tips that might be useful for deciding what to do next:\n")
+            sb.appendLine(infoPool.tips)
+        }
 
         if (infoPool.importantNotes.isNotBlank()) {
             sb.appendLine("\n### Important Notes ###")
+            sb.appendLine("Here are some potentially important content relevant to the user's request you already recorded:\n")
             sb.appendLine(infoPool.importantNotes)
         }
 
-        if (infoPool.actionHistory.isNotEmpty()) {
-            sb.appendLine("### Action History (Order of execution) ###")
-            var cnt = 0
-            infoPool.actionHistory.forEach { element ->
-                cnt++
-                sb.appendLine("- $cnt. $element")
-            }
-        }
-
-
         sb.appendLine("\n---")
-        sb.appendLine("Carefully decide the next action. Choose one from atomic actions or available shortcuts.")
-        sb.appendLine("Format: valid JSON {\"name\": \"ActionName\", \"arguments\": {key: value}}")
-
+        sb.appendLine("Carefully examine all the information provided above and decide on the next action to perform. If you notice an unsolved error in the previous action, think as a human user and attempt to rectify them. You must choose your action from one of the atomic actions or the shortcuts. The shortcuts are predefined sequences of actions that can be used to speed up the process. Each shortcut has a precondition specifying when it is suitable to use. If you plan to use a shortcut, ensure the current phone state satisfies its precondition first.\n\n")
 
         sb.appendLine("#### Atomic Actions ####")
-//        val validActions = if (infoPool.keyboardPre) atomicActionSignatures else atomicActionSignatures.filterKeys { it != "Type" }
-        val validActions = atomicActionSignatures
+        sb.appendLine("The atomic action functions are listed in the format of `name(arguments): description` as follows:\n")
+        val validActions = if (infoPool.keyboardPre) atomicActionSignatures else atomicActionSignatures.filterKeys { it != "Type" }
+
         validActions.forEach { (name, sig) ->
             sb.appendLine("- $name(${sig.arguments.joinToString()}): ${sig.description(infoPool)}")
         }
 
-        sb.appendLine("\n#### Shortcuts (Built-in only) ####")
-        sb.appendLine("The following shortcuts are predefined and often useful (especially Tap_Type_and_Enter). Use them when their preconditions are satisfied.")
+        if (!infoPool.keyboardPre) {
+            sb.appendLine("NOTE: Unable to type. The keyboard has not been activated. To type, please activate the keyboard by tapping on an input box or using a shortcut, which includes tapping on an input box first.\n")
 
-        (initShortcuts + infoPool.shortcuts).forEach { (name, shortcut) ->
-            sb.appendLine("- ${shortcut.name}(${shortcut.arguments.joinToString()}): ${shortcut.description} | Precondition: ${shortcut.precondition}")
-            println("Shortcut: ${shortcut.name}(${shortcut.arguments.joinToString()}): ${shortcut.description} | Precondition: ${shortcut.precondition}")
         }
+
+        sb.appendLine("\n#### Shortcuts ####")
+        sb.appendLine("The shortcut functions are listed in the format of `name(arguments): description | Precondition: precondition` as follows:\n")
+
+        (infoPool.shortcuts).forEach { (name, shortcut) ->
+            sb.appendLine("- ${shortcut.name}(${shortcut.arguments.joinToString()}): ${shortcut.description} | Precondition: ${shortcut.precondition}")
+        }
+        if (infoPool.shortcuts.isEmpty()) {
+            sb.appendLine("No shortcuts available.")
+        }
+
+        sb.appendLine("### Latest Action History ###\n")
+        if (infoPool.actionHistory.isNotEmpty()){
+            sb.appendLine("Recent actions you took previously and whether they were successful:\n")
+            val numOfActions = min(5, infoPool.actionHistory.size)
+//            latest_actions = info_pool.action_history[-num_actions:]
+//            latest_summary = info_pool.summary_history[-num_actions:]
+//            latest_outcomes = info_pool.action_outcomes[-num_actions:]
+//            error_descriptions = info_pool.error_descriptions[-num_actions:]
+//            action_log_strs = []
+//            for act, summ, outcome, err_des in zip(latest_actions, latest_summary, latest_outcomes, error_descriptions):
+//            if outcome == "A":
+//            action_log_str = f"Action: {act} | Description: {summ} | Outcome: Successful\n"
+//            else:
+//            action_log_str = f"Action: {act} | Description: {summ} | Outcome: Failed | Feedback: {err_des}\n"
+//            prompt += action_log_str
+//            action_log_strs.append(action_log_str)
+//            if latest_outcomes[-1] == "C" and "Tap" in action_log_strs[-1] and "Tap" in action_log_strs[-2]:
+//            prompt += "\nHINT: If multiple Tap actions failed to make changes to the screen, consider using a \"Swipe\" action to view more content or use another way to achieve the current subgoal."
+//
+//            prompt += "\n"
+            val latestActions = infoPool.actionHistory.takeLast(numOfActions)
+            val latestSummaries = infoPool.summaryHistory.takeLast(numOfActions)
+            val latestOutcomes = infoPool.actionOutcomes.takeLast(numOfActions)
+            val latestErrorDescriptions = infoPool.errorDescriptions.takeLast(numOfActions)
+            val actionLogStrs = mutableListOf<String>()
+            for (i in latestActions.indices) {
+                if (latestOutcomes[i] == "A") {
+                    sb.appendLine("- Action: ${latestActions[i]} | Description: ${latestSummaries[i]} | Outcome: Successful")
+                }
+                else {
+                    sb.appendLine("- Action: ${latestActions[i]} | Description: ${latestSummaries[i]} | Outcome: Failed | Feedback: ${latestErrorDescriptions[i]}")
+                }
+
+            }
+
+        }
+
+
+//        sb.appendLine("Format: valid JSON {\"name\": \"ActionName\", \"arguments\": {key: value}}")
+
         return sb.toString()
     }
 

@@ -1,3 +1,5 @@
+package com.example.blurr.utilities
+
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString

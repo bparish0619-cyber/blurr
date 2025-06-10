@@ -23,7 +23,7 @@ data class InfoPool(
     var lastAction: String = "",
     var lastActionThought: String = "",
     var importantNotes: String = "",
-
+    var tips: String = "",
     var errorFlagPlan: Boolean = false,
     var errorDescriptionPlan: Boolean = false,
 
@@ -34,6 +34,7 @@ data class InfoPool(
     var currentSubgoal: String = "",
     var prevSubgoal: String = "",
     var errToManagerThresh: Int = 2,
+    var keyboardPre: Boolean = false,
 
     var futureTasks: MutableList<String> = mutableListOf()
 )
