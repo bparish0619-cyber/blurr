@@ -73,5 +73,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.0.0-alpha.16")
     implementation("com.squareup.moshi:moshi:1.15.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    // https://mvnrepository.com/artifact/androidx.test.uiautomator/uiautomator
+    implementation("androidx.test.uiautomator:uiautomator:2.3.0")
 
 }

@@ -15,7 +15,7 @@ abstract class BaseAgent {
     /**
      * Generate a prompt for the LLM based on current InfoPool state.
      */
-    abstract fun getPrompt(infoPool: InfoPool): String
+    abstract fun getPrompt(infoPool: InfoPool, xmlMode: Boolean = true): String
 
     /**
      * Parse the LLM response into a map of structured values.

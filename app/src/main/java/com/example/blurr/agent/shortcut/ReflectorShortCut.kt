@@ -30,7 +30,7 @@ class ReflectorShortCut : BaseAgent() {
 }
 """
 
-    override fun getPrompt(infoPool: InfoPool): String {
+    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
         var prompt = "### Current Task ###\n"
         prompt += "${infoPool.instruction}\n\n"
 

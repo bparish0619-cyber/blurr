@@ -11,7 +11,7 @@ class ExperienceRetrieverShortCut : BaseAgent() {
         return listOf("user" to listOf(TextPart(systemPrompt)))
     }
 
-    override fun getPrompt(infoPool: InfoPool): String {
+    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
         var prompt = "### Existing Shortcuts from Past Experience ###\n"
 
         (infoPool.shortcuts).forEach { (name, shortcut) ->

@@ -28,17 +28,23 @@ class Manager : BaseAgent() {
         return listOf("user" to listOf(TextPart(systemPromptv1)))
     }
 
-    override fun getPrompt(infoPool: InfoPool): String {
+    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
         val sb = StringBuilder()
         sb.appendLine("### User Instruction ###")
         sb.appendLine(infoPool.instruction)
         sb.appendLine()
-        if (infoPool.perceptionInfosPre.isNotEmpty()) {
+        if (infoPool.perceptionInfosPre.isNotEmpty() && !xmlMode ) {
             sb.appendLine("### Visible Screen Elements ###")
             sb.appendLine("The following UI elements are currently visible on the screen:")
             infoPool.perceptionInfosPre.forEach { element ->
                 sb.appendLine("- Text: \"${element.text}\" at position ${element.coordinates}")
             }
+            sb.appendLine()
+        }
+        if (infoPool.perceptionInfosPreXML.isNotEmpty() && xmlMode) {
+            sb.appendLine("### Visible Screen Elements ###")
+            sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
+            sb.appendLine(infoPool.perceptionInfosPreXML)
             sb.appendLine()
         }
         if (infoPool.plan.isEmpty()) {

@@ -10,7 +10,7 @@ class ExperienceRetrieverTips : BaseAgent() {
         return listOf("user" to listOf(TextPart(systemPrompt)))
     }
 
-    override fun getPrompt(infoPool: InfoPool): String {
+    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
         var prompt = "### Existing Tips from Past Experience ###\n"
         prompt += "${infoPool.tips}\n\n"
 
