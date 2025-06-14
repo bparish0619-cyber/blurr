@@ -8,6 +8,12 @@ import java.io.File
 class Finger {
 
     private val TAG = "Finger"
+
+    fun goToChatRoom(message: String) {
+        println("am start -n com.example.blurr/.ChatActivity -e custom_message \"$message\"")
+        Shell.cmd("am start -n com.example.blurr/.ChatActivity -e custom_message \"$message\"").exec()
+    }
+
     fun tap(x: Int, y: Int) {
         Shell.cmd("input tap $x $y").exec()
     }

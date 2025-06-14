@@ -36,68 +36,88 @@ class MainActivity : AppCompatActivity() {
     private lateinit var contentModerationInputField: EditText
     private lateinit var performTaskButton: TextView
     private lateinit var contentModerationButton: TextView
-
-
-    private val handler = Handler(Looper.getMainLooper())
     private lateinit var runnable: Runnable
+    private lateinit var handler: Handler
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Initializing views
         statusText = findViewById(R.id.statusText)
-
         inputField = findViewById(R.id.inputField)
         contentModerationInputField = findViewById(R.id.contentMoniterInputField)
         performTaskButton = findViewById(R.id.performTaskButton)
         contentModerationButton = findViewById(R.id.contentMoniterButton)
 
+        // Initialize Handler and Runnable for repeated task
+        handler = Handler(Looper.getMainLooper())
 
+        // Setting onClickListeners
         performTaskButton.setOnClickListener {
             val userInput = inputField.text.toString()
-            handleUserInput(this,userInput)
+            handleUserInput(this, userInput, statusText)
         }
 
         contentModerationButton.setOnClickListener {
             val contentModerationInput = contentModerationInputField.text.toString()
+            println("contentModerationInput: $contentModerationInput")
+            val fin = Finger()
+            fin.home()
 
-            val con = this
-            // Initialize the runnable
             runnable = object : Runnable {
                 override fun run() {
-                    // Call your function here
-                    contentModeration(con, contentModerationInput)
+                    // Call the content moderation function here
+                    contentModeration(this@MainActivity, contentModerationInput)
                     Log.d("MainActivity", "Function called every 2 seconds")
-                    handler.postDelayed(this, 2000) // Schedule the runnable again after 2 seconds
+                    handler.postDelayed(this, 20000) // Schedule the runnable again after 2 seconds
                 }
-            }        }
+            }
+            // Start the runnable immediately
+            handler.post(runnable)
+        }
 
+        // Check for root access
         Shell.getShell()
         val hasRoot = Shell.isAppGrantedRoot()
 
+        // Set root status on the UI
         statusText.text = if (hasRoot == true) {
             "✅ Root access granted!"
         } else {
             "❌ No root access!"
         }
-
-
     }
 
+    // Content moderation function to check content every 2 seconds
     private fun contentModeration(context: Context, inst: String) {
         CoroutineScope(Dispatchers.IO).launch {
+            val startTime = System.currentTimeMillis()
             val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
-
+            val finger = Finger()
             val eyes = Eyes(context)
             eyes.openXMLEyes()
+            eyes.openEyes()
+
             val pageXML = eyes.getWindowDumpFile().readText()
             println(pageXML)
             val judge = Judge()
             val init = judge.initChat()
             val pro = judge.getPrompt(inst, pageXML, true)
-            val combined = addResponse("user", pro, init)
+            val combined = addResponse("user", pro, init, eyes.getScreenshotFile())
+
             val output = getReasoningModelApiResponse(combined, apiKey = API_KEY)
-            val parsed = judge.
+            val parsed = judge.parseResponse(output)
+
+            println("JUDGEMENT: ${parsed["judgement"]}")
+            println("REASON: ${parsed["reason"]}")
+
+            // Check if content is rejected
+            if (parsed["judgement"]?.isNotEmpty() == true && parsed["judgement"]?.uppercase() == "B") {
+
+                finger.goToChatRoom(parsed["reason"].toString().replace("\"", ""))
+            }
+            println(System.currentTimeMillis() - startTime)
         }
     }
 
@@ -107,7 +127,7 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun handleUserInput(context: Context, inputText: String) {
+    private fun handleUserInput(context: Context, inputText: String, statusText: TextView) {
         CoroutineScope(Dispatchers.IO).launch {
             val taskStartTime = System.currentTimeMillis()
             val finger = Finger()
@@ -158,7 +178,7 @@ class MainActivity : AppCompatActivity() {
 
             var screenshotFile: File = eyes.getScreenshotFile()
             var postScreenshotFile: File
-            var xmlMode = true
+            var xmlMode = false
             while (true) {
                 iteration++
 
@@ -336,6 +356,7 @@ class MainActivity : AppCompatActivity() {
                     val taskEndTime = System.currentTimeMillis()
                     appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: success, final_info_pool: $infoPool, task_duration: ${(taskEndTime - taskStartTime)/1000} seconds}")
                     Log.i("MainActivity", "Task finished successfully by planner.")
+                    statusText.text = infoPool.importantNotes
                     return@launch
                 }
 
@@ -534,6 +555,6 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         // Start the periodic task when the activity is resumed
-        handler.post(runnable)
+//        handler.post(runnable)
     }
 }

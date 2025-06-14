@@ -7,6 +7,7 @@ class Manager : BaseAgent() {
     override fun initChat(): List<Pair<String, List<TextPart>>> {
         val systemPromptv1 = """
             You are a helpful AI assistant for operating mobile phones. Your goal is to track progress and devise high-level plans to achieve the user's requests. Think as if you are a human user operating the phone.
+            NOTE: Use chrome for general search
         """.trimIndent()
         val systemPromptv2 = """
             You are a strategic planner and intelligent assistant designed to operate a mobile phone like a highly capable user.
