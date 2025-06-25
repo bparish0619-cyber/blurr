@@ -11,6 +11,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import com.example.blurr.agent.Operator.ShortcutStep
+import com.example.blurr.utilities.JsonExtraction
 import java.io.FileOutputStream
 import kotlin.math.min
 
@@ -102,7 +103,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
         return listOf("user" to listOf(TextPart(systemPrompt)))
     }
 
-    override fun getPrompt(infoPool: InfoPool): String {
+    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
         val sb = StringBuilder()
         sb.appendLine("### User Instruction ###")
         sb.appendLine(infoPool.instruction)
@@ -136,6 +137,13 @@ class Operator(private val finger: Finger) : BaseAgent() {
             infoPool.perceptionInfosPre.forEach { element ->
                 sb.appendLine("- Element \"${element.text}\" at position ${element.coordinates}")
             }
+            sb.appendLine()
+        }
+
+        if (infoPool.perceptionInfosPreXML.isNotEmpty() && xmlMode) {
+            sb.appendLine("### Visible Screen Elements in XML format ###")
+            sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
+            sb.appendLine(infoPool.perceptionInfosPreXML)
             sb.appendLine()
         }
 
@@ -327,7 +335,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
         val argumentsMap: Map<String, String>
     )
 
-    val initShortcuts = mapOf(
+    val initShortcuts = mutableMapOf(
         "Tap_Type_and_Enter" to Shortcut(
             name = "Tap_Type_and_Enter",
             arguments = listOf("x", "y", "text"),
@@ -348,8 +356,17 @@ class Operator(private val finger: Finger) : BaseAgent() {
     ): Triple<Map<String, Any>?, Int, String?> {
 
         val actionObj = try {
+
             var cleanedActionStr = actionStr.lines().filterNot { it.trim().startsWith("#") }.joinToString("\n")
             cleanedActionStr = cleanedActionStr.lines().filterNot { it.trim().startsWith("//") }.joinToString("\n")
+
+            // Extract JSON from potential markdown code blocks
+            if (cleanedActionStr.startsWith("```json")){
+                cleanedActionStr = cleanedActionStr
+                    .replace(Regex("^```(?:json)?\\s*"), "") // remove opening code block
+                    .replace(Regex("\\s*```\\s*$"), "")     // remove closing code block
+                    .trim()
+            }
 
             val json = org.json.JSONObject(cleanedActionStr)
             val name = json.getString("name")

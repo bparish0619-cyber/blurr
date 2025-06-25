@@ -21,7 +21,7 @@ class ActionReflector : BaseAgent() {
         return listOf("user" to listOf(TextPart(systemPrompt)))
     }
 
-    override fun getPrompt(infoPool: InfoPool): String {
+    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
         val sb = StringBuilder()
 
         sb.appendLine("### User Instruction ###")
@@ -62,6 +62,12 @@ class ActionReflector : BaseAgent() {
             }
         }
         sb.appendLine("Keyboard status before the action: ${if (infoPool.keyboardPre) "The keyboard has been activated and you can type." else "The keyboard has not been activated and you can\\'t type."}\n")
+        if (infoPool.perceptionInfosPreXML.isNotEmpty() && xmlMode) {
+            sb.appendLine("### Visible Screen Elements in XML Form ###")
+            sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
+            sb.appendLine(infoPool.perceptionInfosPreXML)
+            sb.appendLine()
+        }
         sb.appendLine("\n\n")
 
         sb.appendLine("### Screen Information After the Action ###")
@@ -70,7 +76,12 @@ class ActionReflector : BaseAgent() {
                 sb.appendLine("${it.text}; ${it.coordinates}")
             }
         }
-
+        if (infoPool.perceptionInfosPostXML.isNotEmpty() && xmlMode) {
+            sb.appendLine("### Visible Screen Elements in XML Form ###")
+            sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
+            sb.appendLine(infoPool.perceptionInfosPreXML)
+            sb.appendLine()
+        }
         sb.appendLine("Keyboard status before the action: ${if (infoPool.keyboardPost) "The keyboard has been activated and you can type." else "The keyboard has not been activated and you can\\'t type."}\n")
         sb.appendLine("\n\n")
 

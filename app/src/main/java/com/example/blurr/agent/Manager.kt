@@ -7,6 +7,7 @@ class Manager : BaseAgent() {
     override fun initChat(): List<Pair<String, List<TextPart>>> {
         val systemPromptv1 = """
             You are a helpful AI assistant for operating mobile phones. Your goal is to track progress and devise high-level plans to achieve the user's requests. Think as if you are a human user operating the phone.
+            NOTE: Use chrome for general search
         """.trimIndent()
         val systemPromptv2 = """
             You are a strategic planner and intelligent assistant designed to operate a mobile phone like a highly capable user.
@@ -28,17 +29,23 @@ class Manager : BaseAgent() {
         return listOf("user" to listOf(TextPart(systemPromptv1)))
     }
 
-    override fun getPrompt(infoPool: InfoPool): String {
+    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
         val sb = StringBuilder()
         sb.appendLine("### User Instruction ###")
         sb.appendLine(infoPool.instruction)
         sb.appendLine()
-        if (infoPool.perceptionInfosPre.isNotEmpty()) {
+        if (infoPool.perceptionInfosPre.isNotEmpty() && !xmlMode ) {
             sb.appendLine("### Visible Screen Elements ###")
             sb.appendLine("The following UI elements are currently visible on the screen:")
             infoPool.perceptionInfosPre.forEach { element ->
                 sb.appendLine("- Text: \"${element.text}\" at position ${element.coordinates}")
             }
+            sb.appendLine()
+        }
+        if (infoPool.perceptionInfosPreXML.isNotEmpty() && xmlMode) {
+            sb.appendLine("### Visible Screen Elements ###")
+            sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
+            sb.appendLine(infoPool.perceptionInfosPreXML)
             sb.appendLine()
         }
         if (infoPool.plan.isEmpty()) {

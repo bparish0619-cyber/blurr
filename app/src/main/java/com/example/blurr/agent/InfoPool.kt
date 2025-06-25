@@ -13,6 +13,9 @@ data class InfoPool(
     var height: Int = 2340,
     var perceptionInfosPre: MutableList<ClickableInfo> = mutableListOf(),
     var perceptionInfosPost: MutableList<ClickableInfo> = mutableListOf(),
+    var perceptionInfosPreXML: String = "",
+    var perceptionInfosPostXML: String = "",
+
 
     var summaryHistory: MutableList<String> = mutableListOf(),
     var actionHistory: MutableList<String> = mutableListOf(),

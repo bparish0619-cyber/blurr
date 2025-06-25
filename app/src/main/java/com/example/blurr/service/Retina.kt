@@ -1,5 +1,6 @@
 package com.example.blurr.service
 
+import android.R
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Base64
@@ -155,7 +156,7 @@ class Retina(
             fixedArray
         }
     }
-    fun getPerceptionInfos(context: Context?): Triple<List<ClickableInfo>, Int, Int> {
+    fun getPerceptionInfos(context: Context?): Quadruple<List<ClickableInfo>, Int, Int, Boolean> {
         // Step 1: Capture screenshot
         eyes.openEyes()
         val screenshotFile: File = eyes.getScreenshotFile()
@@ -259,6 +260,8 @@ class Retina(
         val sanitizedJson = sanitizeJson(responseText)
 //        println(sanitizedJson)
 
+        var keyBoardMap = mutableMapOf<String, Int>()
+
         val boxes = extractJsonArray(sanitizedJson)
         boxes.mapNotNull { obj ->
             try {
@@ -270,6 +273,7 @@ class Retina(
                 val xmax = box.getDouble(3) / 1000 * width
                 val centerX = ((xmin + xmax) / 2).toInt()
                 val centerY = ((ymin + ymax) / 2).toInt()
+                keyBoardMap[label] = 10
                 clickableInfos.add(ClickableInfo("icon: $label", centerX to centerY))
             } catch (e: Exception) {
                 null
@@ -306,6 +310,7 @@ class Retina(
             val center = obj.getJSONArray("center")
             val cx = center.getDouble(0).toInt()
             val cy = center.getDouble(1).toInt()
+            keyBoardMap[text] = 10
             clickableInfos.add(ClickableInfo("text: $text", cx to cy))
         }
 
@@ -314,7 +319,13 @@ class Retina(
             logPerceptionInfo(context, clickableInfos)
         }
 
-        return Triple(clickableInfos, width, height)
+        // Check if keyboardMap contains all characters from 'a' to 'z'
+        val keyboardOpen = ('a'..'z').all { char ->
+            keyBoardMap.containsKey(char.toString())
+        }
+
+
+        return Quadruple(clickableInfos, width, height, keyboardOpen)
     }
 
     private fun extractJsonArray(text: String): List<JSONObject> {
@@ -340,16 +351,13 @@ class Retina(
 
         return cleanJson
     }
-//    fun sanitizeJson(json: String): String {
-//        return json
-//            .replace("```json", "")
-//            .replace("```", "")
-//            .replace("\\s+".toRegex(), " ") // collapse multiline
-//            .replace(",\\s*([}\\]])".toRegex(), "$1") // trailing commas
-//            .replace("(?<=\\{)\\s*,|,\\s*(?=})".toRegex(), "") // inner object trailing commas
-//            .replace("(?<=\\[)\\s*,|,\\s*(?=])".toRegex(), "") // inner array trailing commas
-//            .trim()
-//    }
-
 
 }
+
+data class Quadruple<A, B, C, D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D
+)
+

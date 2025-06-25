@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">blurr</string>
     <string name="input_the_task">Input the Task</string>
+    <string name="perform_task">Perform Task</string>
+    <string name="content_filtering">Content Filtering</string>
+    <string name="write_things_you_want_to_avoid">Write Things you want to avoid</string>
 </resources>
