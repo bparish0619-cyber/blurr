@@ -1,7 +1,13 @@
 package com.example.blurr
 
 import android.content.Context
+import android.content.Intent
 import android.os.*
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.TextToSpeech.OnInitListener
 import android.util.Log
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
@@ -22,6 +28,7 @@ import com.example.blurr.service.Retina
 import com.example.blurr.service.Eyes
 import com.example.blurr.service.Finger
 import com.example.blurr.utilities.Persistent
+import com.example.blurr.utilities.TTSManager
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.*
 import org.json.JSONObject
@@ -29,7 +36,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), RecognitionListener {
 
     private lateinit var statusText: TextView
     private lateinit var inputField: EditText
@@ -38,11 +45,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var contentModerationButton: TextView
     private lateinit var runnable: Runnable
     private lateinit var handler: Handler
+    private lateinit var speechRecognizer: SpeechRecognizer
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
         // Initializing views
         statusText = findViewById(R.id.statusText)
         inputField = findViewById(R.id.inputField)
@@ -87,11 +94,100 @@ class MainActivity : AppCompatActivity() {
         } else {
             "❌ No root access!"
         }
+        // Initialize SpeechRecognizer
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+        speechRecognizer.setRecognitionListener(this)
+
+        // Start listening when the app starts
+        startListening()
     }
+
+    private fun startListening() {
+        val recognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        recognizerIntent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+        speechRecognizer.startListening(recognizerIntent)
+    }
+
+    override fun onReadyForSpeech(params: Bundle?) {
+        // Called when the speech recognition is ready to begin
+        println("onReadyForSpeech")
+    }
+
+    override fun onBeginningOfSpeech() {
+        println("onBeginningOfSpeech")
+        // Called when the user starts speaking
+    }
+
+    override fun onRmsChanged(rmsdB: Float) {
+        // Called when there is a change in the loudness of the speech input
+        println("onRmsChanged")
+    }
+
+    override fun onBufferReceived(buffer: ByteArray?) {
+        // Called when the recognizer is receiving audio data
+        println("onBufferReceived")
+    }
+
+    override fun onEndOfSpeech() {
+        // Called when the user stops speaking
+        println("onEndOfSpeech")
+    }
+
+    override fun onError(error: Int) {
+        // Called when there is an error in speech recognition
+        if (error == SpeechRecognizer.ERROR_NO_MATCH) {
+            // No match found, continue listening
+            startListening()
+        }
+    }
+
+    override fun onResults(results: Bundle) {
+        println("onResults")
+        // Get the speech recognition results
+        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+
+        if (matches != null && matches.isNotEmpty()) {
+            val recognizedText = matches[0]
+//            val tts = TTSManager(context)
+            println(recognizedText)
+            // Check if the recognized text matches "Hey Panda"
+            if (recognizedText.contains("hey panda", ignoreCase = true)) {
+                // Wake-up phrase detected, perform your action
+//                tts.speak("Hey Panda, I'm listening!", TextToSpeech.QUEUE_FLUSH, null, null)
+
+                // You can trigger any action here, e.g., activate a function or start a new activity
+                performActionAfterWakeup()
+            } else {
+                // Continue listening for the wake-up phrase
+                startListening()
+            }
+        }
+    }
+
+    override fun onPartialResults(partialResults: Bundle?) {
+        println("onPartialResults")
+        // Handle partial results if needed
+    }
+
+    override fun onEvent(eventType: Int, params: Bundle?) {
+        println("onEvent")
+        // Handle special events, if needed
+    }
+
+    // Trigger any action you want after detecting the wake-up phrase
+    private fun performActionAfterWakeup() {
+        println("performActionAfterWakeup")
+        // Add your logic here
+        // For example, open a new activity or show a dialog
+    }
+
 
     // Content moderation function to check content every 2 seconds
     private fun contentModeration(context: Context, inst: String) {
         CoroutineScope(Dispatchers.IO).launch {
+            val tts = TTSManager(context)
+
             val startTime = System.currentTimeMillis()
             val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
             val finger = Finger()
@@ -114,7 +210,13 @@ class MainActivity : AppCompatActivity() {
 
             // Check if content is rejected
             if (parsed["judgement"]?.isNotEmpty() == true && parsed["judgement"]?.uppercase() == "B") {
-
+                try {
+                    // Suspend until TTS is initialized, then speak
+                    tts.speakText(parsed["reason"].toString())
+                } catch (e: Exception) {
+                    // Handle any initialization errors
+                    println("Error: ${e.message}")
+                }
                 finger.goToChatRoom(parsed["reason"].toString().replace("\"", ""))
             }
             println(System.currentTimeMillis() - startTime)
@@ -549,6 +651,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         // Remove callbacks to prevent memory leaks when the activity is destroyed
         handler.removeCallbacks(runnable)
+
         super.onDestroy()
     }
 
