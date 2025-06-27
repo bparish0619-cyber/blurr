@@ -3,7 +3,7 @@ package com.example.blurr.api
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.example.blurr.ScreenInteractionService // <-- IMPORT YOUR SERVICE
+import com.example.blurr.ScreenInteractionService
 
 /**
  * A rewritten Finger class that uses the AccessibilityService for all actions,
@@ -33,15 +33,13 @@ class Finger(private val context: Context) {
                 // Use the app's own context to find the activity class
                 setClassName(context, "com.example.blurr.ChatActivity")
                 putExtra("custom_message", message)
-                // This flag is important if calling startActivity from a non-activity context like a service
-                Intent.setFlags = Intent.FLAG_ACTIVITY_NEW_TASK
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start ChatActivity. Make sure it's defined in your AndroidManifest.xml", e)
         }
     }
-
     /**
      * Taps a point on the screen.
      */

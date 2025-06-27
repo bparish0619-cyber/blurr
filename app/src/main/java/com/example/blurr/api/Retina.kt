@@ -30,26 +30,6 @@ class Retina(
         .callTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    private val boundingBoxSystemInstructionsv1 = """
-        Return bounding boxes as a JSON array with labels. Never return masks or code fencing.
-        If an object is present multiple times, name them according to their unique characteristic (colors, size, position, unique characteristics, etc..).
-    """.trimIndent()
-
-    private val boundingBoxSystemInstructionsv2 = """
-        You are an expert in understanding Android app screenshots. Analyze the UI in the image and identify all distinct, clickable, or recognizable visual elements. This includes:
-        - App icons, logos (e.g., YouTube logo, app logo)
-        - Buttons, toggles, and input fields
-        - Icons (e.g., search, mic, share, play, pause)
-        - Visible text elements (e.g., titles, labels, placeholders)
-
-        Return the result as a JSON array, where each object contains:
-        - "label": a short description of the element (e.g., "YouTube logo", "search icon", "login button", "video title")
-        - "box_2d": the bounding box as [ymin, xmin, ymax, xmax] **in 1000-scale relative coordinates**
-
-        If similar items appear multiple times, distinguish them with spatial or visual cues (e.g., "top right icon", "blue button", "bottom search bar").
-
-           """.trimIndent()
-
     private val boundingBoxSystemInstructionsv3 = """
         You are an expert at analyzing Android app screenshots. Your task is to extract clickable or recognizable UI elements such as:
 

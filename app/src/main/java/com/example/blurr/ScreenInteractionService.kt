@@ -1,34 +1,26 @@
 package com.example.blurr
 
-
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
-import android.content.ContentValues
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Path
-import android.hardware.HardwareBuffer
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
-
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import androidx.annotation.RequiresApi
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.Executors
 import android.util.Xml
 import android.view.accessibility.AccessibilityNodeInfo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlSerializer
-import java.io.IOException
+import java.io.StringWriter
 
 
 class ScreenInteractionService : AccessibilityService() {
@@ -46,35 +38,41 @@ class ScreenInteractionService : AccessibilityService() {
         instance = this
         Log.d("InteractionService", "Accessibility Service connected.")
     }
-// Add these imports to the top of ScreenInteractionService.kt
 
-    // Add this new method inside your ScreenInteractionService class
-    fun dumpWindowHierarchyToFile(outputFile: File) {
-        val rootNode = rootInActiveWindow ?: return // Get the root node of the active window
+    suspend fun dumpWindowHierarchy(): String {
+        // Ensure this potentially long-running operation happens off the main thread.
+        // Dispatchers.Default is perfect for CPU-bound work like traversing a tree.
+        return withContext(Dispatchers.Default) {
+            val rootNode = rootInActiveWindow
+            if (rootNode == null) {
+                Log.e("InteractionService", "Root node is null, cannot dump hierarchy.")
+                return@withContext "<hierarchy/>" // Return empty, valid XML
+            }
 
-        try {
-            val fileOutputStream = FileOutputStream(outputFile)
-            val serializer: XmlSerializer = Xml.newSerializer()
+            // Use a StringWriter to build the XML in memory instead of a file
+            val stringWriter = StringWriter()
+            try {
+                val serializer: XmlSerializer = Xml.newSerializer()
+                serializer.setOutput(stringWriter)
+                serializer.startDocument("UTF-8", true)
+                serializer.startTag(null, "hierarchy")
 
-            serializer.setOutput(fileOutputStream, "UTF-8")
-            serializer.startDocument("UTF-8", true)
-            serializer.startTag(null, "hierarchy")
+                // The recursive dumpNode helper works perfectly here without any changes!
+                dumpNode(rootNode, serializer, 0)
 
-            // Start the recursive traversal and XML generation
-            dumpNode(rootNode, serializer, 0)
+                serializer.endTag(null, "hierarchy")
+                serializer.endDocument()
 
-            serializer.endTag(null, "hierarchy")
-            serializer.endDocument()
-            fileOutputStream.close()
+                Log.d("InteractionService", "UI hierarchy dumped to string successfully.")
+            } catch (e: Exception) {
+                Log.e("InteractionService", "Error dumping UI hierarchy to string", e)
+                return@withContext "<hierarchy error=\"${e.message}\"/>" // Return error XML
+            }
 
-            Log.d("InteractionService", "UI hierarchy dumped to ${outputFile.absolutePath}")
-
-        } catch (e: IOException) {
-            Log.e("InteractionService", "Error dumping UI hierarchy", e)
+            // Return the final XML string
+            stringWriter.toString()
         }
     }
-
-    // Add this private helper function inside your ScreenInteractionService class
     private fun dumpNode(node: android.view.accessibility.AccessibilityNodeInfo?, serializer: XmlSerializer, index: Int) {
         if (node == null) return
 
@@ -109,6 +107,7 @@ class ScreenInteractionService : AccessibilityService() {
 
         serializer.endTag(null, "node")
     }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // We are triggering actions proactively, so we don't need to react to events.
     }

@@ -40,7 +40,7 @@ class Judge {
 
         sb.appendLine("### Reasoning ###")
 //        sb.appendLine("Provide a detailed rationale for your decision based on the user's preferences and the current screen content.")
-        sb.appendLine("Provide a accurate rationale for your decision based on the user's preferences and the current screen content. Try to keep it light hearted and if possible funny.")
+        sb.appendLine("Provide a accurate rationale for your decision based on the user's preferences and the current screen content. Try to keep it light hearted and if possible funny. phrase it as if you are talking to the user")
 
         sb.appendLine("\n----\n")
         sb.appendLine("NOTE: Only include the necessary information. Avoid adding any extra details.")

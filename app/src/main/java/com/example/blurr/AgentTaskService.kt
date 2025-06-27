@@ -1,152 +1,58 @@
 package com.example.blurr
 
-import android.annotation.SuppressLint
-import android.content.ComponentCallbacks2
-import android.content.Context
+import android.app.Notification
+import android.app.Service
 import android.content.Intent
-import android.graphics.Color
-import android.os.*
-import android.provider.Settings
-import android.speech.SpeechRecognizer
-import android.text.TextUtils
+import android.os.IBinder
 import android.util.Log
-import android.widget.*
-import androidx.annotation.RequiresApi
-import androidx.appcompat.app.AppCompatActivity
-
+import androidx.core.app.NotificationCompat
+import com.example.blurr.R
 import com.example.blurr.api.Finger
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import java.io.File
-
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 
-class MainActivity : AppCompatActivity() {
+class AgentTaskService : Service() {
 
-    private lateinit var statusText: TextView
-    private lateinit var inputField: EditText
-    private lateinit var contentModerationInputField: EditText
-    private lateinit var performTaskButton: TextView
-    private lateinit var contentModerationButton: TextView
-    private lateinit var runnable: Runnable
-    private lateinit var handler: Handler
-    private lateinit var startAgent : Button
-    private lateinit var stopAgent : Button
-    private lateinit var grantPermission: Button
-    private lateinit var tvPermissionStatus: TextView
-    private lateinit var tvServiceStatus: TextView
+    private var agentJob: Job? = null // To keep track of our coroutine
 
-    private lateinit var speechRecognizer: SpeechRecognizer
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            if (isGranted) {
-                Log.i("MainActivity", "Notification permission GRANTED.")
-                Toast.makeText(this, "Notification permission granted!", Toast.LENGTH_SHORT).show()
-            } else {
-                Log.w("MainActivity", "Notification permission DENIED.")
-                Toast.makeText(this, "Notification permission denied. The service notification will not be visible.", Toast.LENGTH_LONG).show()
-            }
-        }
-
-    @RequiresApi(Build.VERSION_CODES.R)
-    override fun onCreate(savedInstanceState: Bundle?) {
-
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-
-        askForNotificationPermission()
-
-        startAgent = findViewById(R.id.btn_start_service)
-        stopAgent = findViewById(R.id.btn_stop_service)
-        grantPermission = findViewById(R.id.btn_request_permission)
-        tvPermissionStatus = findViewById(R.id.tv_permission_status)
-        tvServiceStatus = findViewById(R.id.tv_service_status)
-        inputField = findViewById(R.id.inputField)
-        contentModerationInputField = findViewById(R.id.contentMoniterInputField)
-        performTaskButton = findViewById(R.id.performTaskButton)
-        contentModerationButton = findViewById(R.id.contentMoniterButton)
-
-
-        grantPermission.setOnClickListener {
-            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            startActivity(intent)
-        }
-
-        handler = Handler(Looper.getMainLooper())
-
-        performTaskButton.setOnClickListener {
-            val userInput = inputField.text.toString()
-
-//            handleUserInput(this, userInput, statusText)
-        }
-
-//      contentModerationButton.setOnClickListener {
-//            val contentModerationInput = contentModerationInputField.text.toString()
-//            println("contentModerationInput: $contentModerationInput")
-//            val fin = Finger(this)
-//            fin.home()
-//            Thread.sleep(1000)
-//
-//            runnable = object : Runnable {
-//                override fun run() {
-//                    // Call the content moderation function here
-//                    CoroutineScope(Dispatchers.IO).launch {
-//                     contentModeration(this@MainActivity, contentModerationInput)
-//                    }
-//                    Log.d("MainActivity", "Function called every 2 seconds")
-//                    handler.postDelayed(this, 8000) // Schedule the runnable again after 2 seconds
-//                }
-//            }
-//            handler.post(runnable)
-//        }
-
-        // --- START THE SERVICE ---
-        contentModerationButton.setOnClickListener {
-            val instruction = contentModerationInputField.text.toString()
-            val fin = Finger(this)
-            fin.home()
-            Thread.sleep(1000)
-            if (instruction.isNotBlank()) {
-                Log.d("MainActivity", "Requesting to start ContentModerationService.")
-
-                // Create an Intent to target our new service
-                val serviceIntent = Intent(this, ContentModerationService::class.java).apply {
-                    // Pass the user's instruction to the service
-                    putExtra("MODERATION_INSTRUCTION", instruction)
-                }
-
-                // Use startService() to start it
-                startService(serviceIntent)
-                updateUI() // Update button states
-                Toast.makeText(this, "Content Moderation Started", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Please enter an instruction", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-//        // --- STOP THE SERVICE ---
-//        stopModerationButton.setOnClickListener {
-//            Log.d("MainActivity", "Requesting to stop ContentModerationService.")
-//
-//            val serviceIntent = Intent(this, ContentModerationService::class.java)
-//            stopService(serviceIntent)
-//            updateUI() // Update button states
-//            Toast.makeText(this, "Content Moderation Stopped", Toast.LENGTH_SHORT).show()
-//        }
+    companion object {
+        const val NOTIFICATION_CHANNEL_ID = "AgentTaskChannel"
+        const val NOTIFICATION_ID = 2 // Use a different ID from your other service
     }
 
-    fun appendToFile(file: File, content: String) {
-        file.appendText(content + "\n")
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val inputText = intent?.getStringExtra("USER_INPUT")
+        if (inputText == null) {
+            Log.e("AgentTaskService", "Service started without user input. Stopping.")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        val notification: Notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("Agent Task Running")
+            .setContentText("Processing your request: $inputText")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .build()
+        startForeground(NOTIFICATION_ID, notification)
+
+        Log.d("AgentTaskService", "Starting agent task with input: $inputText")
+
+        agentJob = CoroutineScope(Dispatchers.IO).launch {
+            runAgentLogic(inputText)
+
+            Log.d("AgentTaskService", "Agent task finished. Stopping service.")
+            stopSelf()
+        }
+
+        return START_NOT_STICKY
     }
 
-
-    private fun handleUserInput(context: Context, inputText: String, statusText: TextView) {
-        CoroutineScope(Dispatchers.IO).launch {
+    private suspend fun runAgentLogic(inputText: String) {
+//        CoroutineScope(Dispatchers.IO).launch {
             val taskStartTime = System.currentTimeMillis()
             val finger = Finger(this)
             finger.home()
@@ -559,126 +465,16 @@ class MainActivity : AppCompatActivity() {
                 infoPool.keyboardPre = infoPool.keyboardPost
                 infoPool.perceptionInfosPre = infoPool.perceptionInfosPost
                 infoPool.perceptionInfosPreXML = infoPool.perceptionInfosPostXML
-            }
+//            }
         }
     }
-
 
     override fun onDestroy() {
-        // Remove callbacks to prevent memory leaks when the activity is destroyed
-        handler.removeCallbacks(runnable)
-
         super.onDestroy()
+        // If the service is destroyed unexpectedly, cancel the coroutine
+        agentJob?.cancel()
+        Log.d("AgentTaskService", "Service destroyed.")
     }
 
-
-// ... inside your Service or Activity class
-
-    override fun onTrimMemory(level: Int) {
-        super.onTrimMemory(level)
-        Log.w("AppMemory", "onTrimMemory event received with level: $level")
-
-        // Use a 'when' statement to react to the different levels
-        when (level) {
-            // --- While your app is running in the foreground ---
-            ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE -> {
-                Log.i("AppMemory", "MEMORY WARNING: Running Moderate. Consider releasing some cache.")
-            }
-            ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW -> {
-                Log.w("AppMemory", "MEMORY WARNING: Running Low. Release non-essential resources.")
-            }
-            ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
-                Log.e("AppMemory", "MEMORY WARNING: Running CRITICAL. System is killing other apps.")
-            }
-
-
-            // --- When your app's UI is no longer visible ---
-            ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> {
-                Log.i("AppMemory", "UI is hidden. Release all UI-related resources (Bitmaps, etc.).")
-                // This is the best place to free up memory used by your UI.
-            }
-
-
-            // --- When your app is in the background and at risk of being killed ---
-            ComponentCallbacks2.TRIM_MEMORY_BACKGROUND,
-            ComponentCallbacks2.TRIM_MEMORY_MODERATE,
-            ComponentCallbacks2.TRIM_MEMORY_COMPLETE -> {
-                Log.e("AppMemory", "CRITICAL WARNING: App is in the background and is a prime candidate for termination.")
-                // If you get this, your process could be killed at any moment.
-                // This is your last chance to save any critical state.
-            }
-
-            else -> {
-                Log.d("AppMemory", "Unhandled memory trim level: $level")
-            }
-        }
-    }
-    override fun onResume() {
-        super.onResume()
-        // Start the periodic task when the activity is resumed
-        updateUI()
-//        handler.post(runnable)
-    }
-    private fun isAccessibilityServiceEnabled(): Boolean {
-        val service = packageName + "/" + ScreenInteractionService::class.java.canonicalName
-        val accessibilityEnabled = Settings.Secure.getInt(
-            applicationContext.contentResolver,
-            Settings.Secure.ACCESSIBILITY_ENABLED,
-            0
-        )
-        if (accessibilityEnabled == 1) {
-            val settingValue = Settings.Secure.getString(
-                applicationContext.contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            )
-            if (settingValue != null) {
-                val splitter = TextUtils.SimpleStringSplitter(':')
-                splitter.setString(settingValue)
-                while (splitter.hasNext()) {
-                    val componentName = splitter.next()
-                    if (componentName.equals(service, ignoreCase = true)) {
-                        return true
-                    }
-                }
-            }
-        }
-        return false
-    }
-    @SuppressLint("SetTextI18n")
-    private fun updateUI() {
-        val isPermissionGranted = isAccessibilityServiceEnabled()
-        val isServiceRunning = AgentService.isRunning
-
-        tvPermissionStatus.text = if (isPermissionGranted) "Permission: Granted" else "Permission: Not Granted"
-        tvPermissionStatus.setTextColor(if (isPermissionGranted) Color.GREEN else Color.RED)
-
-        startAgent.isEnabled = isPermissionGranted && !isServiceRunning
-        stopAgent.isEnabled = isPermissionGranted && isServiceRunning
-        tvServiceStatus.text = "Service Status: ${if (isServiceRunning) "Running" else "Stopped"}"
-    }
-    private fun askForNotificationPermission() {
-        // This is only required for Android 13 (API 33) and higher.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            when {
-                // Check if the permission is already granted.
-                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
-                        PackageManager.PERMISSION_GRANTED -> {
-                    Log.i("MainActivity", "Notification permission is already granted.")
-                }
-                // Explain to the user why you need the permission.
-                shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
-                    // In a real app, you'd show a dialog explaining why you need this.
-                    // For now, we'll just launch the request.
-                    Log.w("MainActivity", "Showing rationale and requesting permission.")
-                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-                // Directly ask for the permission.
-                else -> {
-                    Log.i("MainActivity", "Requesting notification permission for the first time.")
-                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-            }
-        }
-    }
-
+    override fun onBind(intent: Intent?): IBinder? = null
 }

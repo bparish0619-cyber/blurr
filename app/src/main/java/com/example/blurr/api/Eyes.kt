@@ -37,14 +37,14 @@ class Eyes(context: Context) {
     /**
      * Dumps the current UI layout to an XML file using the Accessibility Service.
      */
-    fun openXMLEyes() {
+    suspend fun openXMLEyes(): String {
         val service = ScreenInteractionService.instance
         if (service == null) {
             Log.e("AccessibilityController", "Accessibility Service is not running!")
-            return
+            return "<hierarchy/>"
         }
         Log.d("AccessibilityController", "Requesting UI layout dump...")
-        service.dumpWindowHierarchyToFile(xmlFile)
+        return service.dumpWindowHierarchy()
     }
 
     /**
