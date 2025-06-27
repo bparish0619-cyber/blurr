@@ -11,7 +11,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class EyesController(context: Context) {
+class Eyes(context: Context) {
 
     // This now points to the public directory where your screenshots will be saved.
     private val publicPicturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)

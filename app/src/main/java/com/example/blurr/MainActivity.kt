@@ -30,6 +30,7 @@ import androidx.appcompat.app.AppCompatActivity
 //import com.example.blurr.agent.shortcut.ReflectorShortCut
 //import com.example.blurr.agent.tips.ReflectorTips
 import com.example.blurr.databinding.ActivityMainBinding
+import com.example.blurr.service.Eyes
 import com.example.blurr.service.EyesController
 //import com.example.blurr.service.Retina
 //import com.example.blurr.service.Eyes
@@ -85,7 +86,7 @@ class MainActivity : AppCompatActivity() {
 
         startAgent.setOnClickListener {
             println("btnStartService")
-            val eyes = EyesController(this)
+            val eyes = Eyes(this)
             eyes.captureScreenshot()
             eyes.captureLayout()
 
