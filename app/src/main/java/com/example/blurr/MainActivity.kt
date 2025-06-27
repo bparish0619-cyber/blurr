@@ -15,8 +15,9 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.blurr.agent.Judge
 import com.example.blurr.utilities.addResponse
 import com.example.blurr.utilities.getReasoningModelApiResponse
-import com.example.blurr.service.Eyes
-import com.example.blurr.service.Finger
+import com.example.blurr.api.Eyes
+import com.example.blurr.api.Finger
+import com.example.blurr.utilities.Persistent
 import com.example.blurr.utilities.TTSManager
 import kotlinx.coroutines.*
 import java.io.File
@@ -74,14 +75,16 @@ class MainActivity : AppCompatActivity() {
             println("contentModerationInput: $contentModerationInput")
             val fin = Finger(this)
             fin.home()
-
+            Thread.sleep(1000)
 
             runnable = object : Runnable {
                 override fun run() {
                     // Call the content moderation function here
-                    contentModeration(this@MainActivity, contentModerationInput)
+                    CoroutineScope(Dispatchers.IO).launch {
+                     contentModeration(this@MainActivity, contentModerationInput)
+                    }
                     Log.d("MainActivity", "Function called every 2 seconds")
-                    handler.postDelayed(this, 20000) // Schedule the runnable again after 2 seconds
+                    handler.postDelayed(this, 8000) // Schedule the runnable again after 2 seconds
                 }
             }
             handler.post(runnable)
@@ -89,50 +92,105 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-
-
-    // Content moderation function to check content every 2 seconds
     @RequiresApi(Build.VERSION_CODES.R)
-    private fun contentModeration(context: Context, inst: String) {
-        CoroutineScope(Dispatchers.IO).launch {
-            println("contentModeration started")
-            val tts = TTSManager(context)
+    private suspend fun contentModeration(context: Context, inst: String) {
+        println("contentModeration started")
+        val tts = TTSManager(context)
+        val startTime = System.currentTimeMillis()
+        val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
+        val finger = Finger(context)
+        val eyes = Eyes(context)
 
-            val startTime = System.currentTimeMillis()
-            val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
-            val finger = Finger(context)
-            val eyes = Eyes(context)
-            eyes.openXMLEyes()
-            eyes.openEyes()
+        try {
+            // 1. Capture Layout - Looks like a simple function call
+//            val pageXML = eyes.openXMLEyes()
+//            println(pageXML)
 
-            val pageXML = eyes.getWindowDumpFile().readText()
-            println(pageXML)
+            // 2. Capture Screenshot - Also looks like a simple function call
+            val screenshotBitmap = eyes.openEyes()
+
+            // 3. Prepare AI Prompt
             val judge = Judge()
             val init = judge.initChat()
-            val pro = judge.getPrompt(inst, pageXML, true)
-            val combined = addResponse("user", pro, init, eyes.getScreenshotFile())
+            val pro = judge.getPrompt(inst, "pageXML not present use screenshot", true)
 
-            val output = getReasoningModelApiResponse(combined, apiKey = API_KEY)
-            val parsed = judge.parseResponse(output)
-
-            println("JUDGEMENT: ${parsed["judgement"]}")
-            println("REASON: ${parsed["reason"]}")
-
-            // Check if content is rejected
-            if (parsed["judgement"]?.isNotEmpty() == true && parsed["judgement"]?.uppercase() == "B") {
-                try {
-                    // Suspend until TTS is initialized, then speak
-                    tts.speakText(parsed["reason"].toString())
-                } catch (e: Exception) {
-                    // Handle any initialization errors
-                    println("Error: ${e.message}")
+            // Check if the screenshot was captured successfully
+            if (screenshotBitmap != null) {
+                // (Optional but Recommended) Save the bitmap for debugging in the background
+                CoroutineScope(Dispatchers.IO).launch {
+                    var persentance = Persistent()
+                    persentance.saveBitmapForDebugging(screenshotBitmap)
                 }
-                finger.goToChatRoom(parsed["reason"].toString().replace("\"", ""))
+
+                // 4. Call the AI with the in-memory bitmap
+                val combined = addResponse("user", pro, init, imageBitmap = screenshotBitmap)
+                val output = getReasoningModelApiResponse(combined, apiKey = API_KEY)
+                val parsed = judge.parseResponse(output)
+
+                println("JUDGEMENT: ${parsed["judgement"]}")
+                println("REASON: ${parsed["reason"]}")
+
+                // 5. Act on the result
+                if (parsed["judgement"]?.isNotEmpty() == true && parsed["judgement"]?.uppercase() == "B") {
+                    tts.speakText(parsed["reason"].toString())
+                    finger.goToChatRoom(parsed["reason"].toString().replace("\"", ""))
+                }
+            } else {
+                Log.e("ContentModeration", "Failed to capture screenshot.")
             }
-            println(System.currentTimeMillis() - startTime)
+
+        } catch (e: Exception) {
+            // Now you can handle errors from any suspend function in one place
+            Log.e("ContentModeration", "An error occurred during the moderation process", e)
         }
+
+        println("Total time: ${System.currentTimeMillis() - startTime}ms")
     }
 
+
+
+//    // Content moderation function to check content every 2 seconds
+//    @RequiresApi(Build.VERSION_CODES.R)
+//    private fun contentModeration(context: Context, inst: String) {
+//        CoroutineScope(Dispatchers.IO).launch {
+//            println("contentModeration started")
+//            val tts = TTSManager(context)
+//
+//            val startTime = System.currentTimeMillis()
+//            val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
+//            val finger = Finger(context)
+//            val eyes = Eyes(context)
+//            eyes.openXMLEyes()
+//            eyes.openEyes()
+//
+//            val pageXML = eyes.getWindowDumpFile().readText()
+//            println(pageXML)
+//            val judge = Judge()
+//            val init = judge.initChat()
+//            val pro = judge.getPrompt(inst, pageXML, true)
+//            val combined = addResponse("user", pro, init, eyes.getScreenshotFile())
+//
+//            val output = getReasoningModelApiResponse(combined, apiKey = API_KEY)
+//            val parsed = judge.parseResponse(output)
+//
+//            println("JUDGEMENT: ${parsed["judgement"]}")
+//            println("REASON: ${parsed["reason"]}")
+//
+//            // Check if content is rejected
+//            if (parsed["judgement"]?.isNotEmpty() == true && parsed["judgement"]?.uppercase() == "B") {
+//                try {
+//                    // Suspend until TTS is initialized, then speak
+//                    tts.speakText(parsed["reason"].toString())
+//                } catch (e: Exception) {
+//                    // Handle any initialization errors
+//                    println("Error: ${e.message}")
+//                }
+//                finger.goToChatRoom(parsed["reason"].toString().replace("\"", ""))
+//            }
+//            println(System.currentTimeMillis() - startTime)
+//        }
+//    }
+//
 
     fun appendToFile(file: File, content: String) {
         file.appendText(content + "\n")

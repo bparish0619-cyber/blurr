@@ -1,4 +1,4 @@
-package com.example.blurr.service
+package com.example.blurr.api
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -8,9 +8,6 @@ import java.io.File
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.example.blurr.ScreenInteractionService
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class Eyes(context: Context) {
 
@@ -27,26 +24,14 @@ class Eyes(context: Context) {
      * Takes a screenshot and saves it to the public Pictures/ScreenAgent directory.
      */
     @RequiresApi(Build.VERSION_CODES.R)
-    fun openEyes(onComplete: (Bitmap) -> Unit) {
+    suspend fun openEyes(): Bitmap? {
         val service = ScreenInteractionService.instance
         if (service == null) {
-            Log.e("AccessibilityController", "Accessibility Service is not running!")
-            return
+            Log.e("Eyes", "Accessibility Service is not running!")
+            return null
         }
-
-        // 1. Define where to save the image (e.g., Pictures/ScreenAgent/)
-        val screenshotDir = File(publicPicturesDir, "ScreenAgent")
-        screenshotDir.mkdirs() // Create the directory if it doesn't exist
-
-        // 2. Create a unique filename with a timestamp
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val file = File(screenshotDir, "SS_$timestamp.png")
-        this.latestScreenshotFile = file // Store the path of the latest file
-
-        Log.d("AccessibilityController", "Requesting screenshot to be saved at: ${file.absolutePath}")
-
-        // 3. Call the modified service method, passing the output file
-        service.captureScreenshot(onComplete)
+        // Directly call the suspend function on the service
+        return service.captureScreenshot()
     }
 
     /**

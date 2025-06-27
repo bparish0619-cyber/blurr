@@ -1,4 +1,4 @@
-package com.example.blurr.service
+package com.example.blurr.api
 
 import android.content.Context
 import android.content.Intent
@@ -34,7 +34,7 @@ class Finger(private val context: Context) {
                 setClassName(context, "com.example.blurr.ChatActivity")
                 putExtra("custom_message", message)
                 // This flag is important if calling startActivity from a non-activity context like a service
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                Intent.setFlags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)
         } catch (e: Exception) {

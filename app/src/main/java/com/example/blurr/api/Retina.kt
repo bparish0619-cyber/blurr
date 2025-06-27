@@ -1,6 +1,5 @@
-package com.example.blurr.service
+package com.example.blurr.api
 
-import android.R
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Base64
@@ -89,7 +88,7 @@ class Retina(
 
 
     @RequiresApi(Build.VERSION_CODES.R)
-    fun logPerceptionInfo(context: Context, clickableInfos: List<ClickableInfo>) {
+    suspend fun logPerceptionInfo(context: Context, clickableInfos: List<ClickableInfo>) {
         println("Logging perception info")
         val eyes = Eyes(context)
         eyes.openEyes()
@@ -160,7 +159,7 @@ class Retina(
         }
     }
     @RequiresApi(Build.VERSION_CODES.R)
-    fun getPerceptionInfos(context: Context?): Quadruple<List<ClickableInfo>, Int, Int, Boolean> {
+    suspend fun getPerceptionInfos(context: Context?): Quadruple<List<ClickableInfo>, Int, Int, Boolean> {
         // Step 1: Capture screenshot
         eyes.openEyes()
         val screenshotFile: File? = eyes.getScreenshotFile()

@@ -1,8 +1,8 @@
 package com.example.blurr.agent
 
 import android.content.Context
-import com.example.blurr.service.Eyes
-import com.example.blurr.service.Finger
+import com.example.blurr.api.Eyes
+import com.example.blurr.api.Finger
 import com.google.ai.client.generativeai.type.TextPart
 import java.io.File
 import android.graphics.Bitmap
@@ -13,7 +13,6 @@ import android.graphics.Paint
 import android.os.Build
 import androidx.annotation.RequiresApi
 import com.example.blurr.agent.Operator.ShortcutStep
-import com.example.blurr.utilities.JsonExtraction
 import java.io.FileOutputStream
 import kotlin.math.min
 
@@ -312,7 +311,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
     )
 
     @RequiresApi(Build.VERSION_CODES.R)
-    fun execute(
+    suspend fun execute(
         actionStr: String,
         infoPool: InfoPool,
         context: Context,

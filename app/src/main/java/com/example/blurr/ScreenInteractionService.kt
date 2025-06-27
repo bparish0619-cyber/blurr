@@ -8,6 +8,9 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Path
 import android.hardware.HardwareBuffer
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
+
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -201,9 +204,9 @@ class ScreenInteractionService : AccessibilityService() {
     }
 
 
-    // The callback now provides the Bitmap directly
+    // Replace the old captureScreenshot(onComplete:...) with this new suspend function
     @RequiresApi(Build.VERSION_CODES.R)
-    fun captureScreenshot(onComplete: (Bitmap) -> Unit) { // MODIFIED: Callback provides Bitmap
+    suspend fun captureScreenshot(): Bitmap = suspendCancellableCoroutine { continuation ->
         takeScreenshot(0, executor, @RequiresApi(Build.VERSION_CODES.R)
         object : TakeScreenshotCallback {
             override fun onSuccess(screenshot: ScreenshotResult) {
@@ -212,13 +215,21 @@ class ScreenInteractionService : AccessibilityService() {
                 if (hardwareBuffer != null) {
                     val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
                     if (bitmap != null) {
-                        // Call the callback immediately with the bitmap data
-                        onComplete(bitmap)
+                        // Resume the coroutine with the successful result
+                        continuation.resume(bitmap)
+                    } else {
+                        continuation.resumeWith(Result.failure(Exception("Failed to wrap hardware buffer")))
                     }
                     hardwareBuffer.close()
+                } else {
+                    continuation.resumeWith(Result.failure(Exception("Screenshot hardware buffer was null")))
                 }
             }
-            override fun onFailure(errorCode: Int) { /* ... */ }
+
+            override fun onFailure(errorCode: Int) {
+                // Resume the coroutine with an exception
+                continuation.resumeWith(Result.failure(Exception("Screenshot failed with error code: $errorCode")))
+            }
         })
     }
 
