@@ -1,6 +1,7 @@
 package com.example.blurr.service
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.os.Build
 import android.os.Environment
 import java.io.File
@@ -26,7 +27,7 @@ class Eyes(context: Context) {
      * Takes a screenshot and saves it to the public Pictures/ScreenAgent directory.
      */
     @RequiresApi(Build.VERSION_CODES.R)
-    fun captureScreenshot() {
+    fun openEyes(onComplete: (Bitmap) -> Unit) {
         val service = ScreenInteractionService.instance
         if (service == null) {
             Log.e("AccessibilityController", "Accessibility Service is not running!")
@@ -45,13 +46,13 @@ class Eyes(context: Context) {
         Log.d("AccessibilityController", "Requesting screenshot to be saved at: ${file.absolutePath}")
 
         // 3. Call the modified service method, passing the output file
-        service.captureScreenshot(file)
+        service.captureScreenshot(onComplete)
     }
 
     /**
      * Dumps the current UI layout to an XML file using the Accessibility Service.
      */
-    fun captureLayout() {
+    fun openXMLEyes() {
         val service = ScreenInteractionService.instance
         if (service == null) {
             Log.e("AccessibilityController", "Accessibility Service is not running!")

@@ -10,6 +10,8 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.os.Build
+import androidx.annotation.RequiresApi
 import com.example.blurr.agent.Operator.ShortcutStep
 import com.example.blurr.utilities.JsonExtraction
 import java.io.FileOutputStream
@@ -63,42 +65,6 @@ class Operator(private val finger: Finger) : BaseAgent() {
             Your goal is to choose the correct actions to complete the user's instruction.
             Think as if you are a human user operating the phone.
         """.trimIndent()
-
-//        val systemPromptv2 = """
-//            You are a UI automation agent responsible for selecting and executing the next best action on a mobile phone screen.
-//
-//            Your goal is to analyze the current screen context, understand the user’s goal, and choose a valid atomic action or shortcut that brings the user closer to their objective.
-//
-//            ## NOTE ##
-//            - If you need to tap the search bar or icon try looking for Magnifying Glass icon. Generally it is used for search.
-//            - Make sure to add a magnifying glass and label it as search. It is generally used for search.
-//            - Only return the JSON array. Do not include any explanation, markdown, or code formatting.
-//            - Do not include text outside of the JSON array. Do not use markdown, do not wrap in code blocks, and do not use ellipsis. [Sometime when parsing time, it give json parse error, example 6:23am]
-//
-//            Guidelines:
-//            - Think like a real user: imagine tapping, typing, swiping, or navigating based on what is visible on the screen.
-//            - Instead taping every key when keyboard is open, use the Action Type.
-//            - Only choose actions that are feasible given the visible UI elements.
-//            - Use shortcuts when they are applicable to speed up common tasks.
-//            - Use accurate pixel coordinates for actions such as 'Tap' or 'Swipe'.
-//            - You may use available shortcuts, but you must ensure the preconditions are satisfied.
-//            - Don't click on Logos, if you want search, just stick to the search bar/icons.
-//            - If you see a keyboard on the screen, and your goals are to type, just start typing instead of enabling the input text box (Keyboard means the inputbox enabled)
-//
-//            Output format:
-//            Return the action in strict JSON format:
-//            {
-//              "name": "ActionName",
-//              "arguments": {
-//                "arg1": value1,
-//                "arg2": value2
-//              }
-//            }
-//
-//            Do not return any explanation or extra formatting (like Markdown code blocks)
-//            BAD -> ```json{"name": "Tap", "arguments": {"x": 1356, "y": 89}}```
-//            GOOD -> {"name": "Tap", "arguments": {"x": 1356, "y": 89}}
-//        """.trimIndent()
 
         return listOf("user" to listOf(TextPart(systemPrompt)))
     }
@@ -278,7 +244,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
         val eyes = Eyes(context)
         val screenshotFile = eyes.getScreenshotFile()
 
-        val bitmap = BitmapFactory.decodeFile(screenshotFile.absolutePath)
+        val bitmap = BitmapFactory.decodeFile(screenshotFile?.absolutePath)
             .copy(Bitmap.Config.ARGB_8888, true)
 
         val canvas = Canvas(bitmap)
@@ -315,10 +281,6 @@ class Operator(private val finger: Finger) : BaseAgent() {
         }
         println("Logging of actionInfo saved in data/data/com.example.blurr/files/actionLogs/action_$timestamp.jpg")
 
-//        filePath.parentFile?.mkdirs()
-//        FileOutputStream(filePath).use { out ->
-//            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-//        }
     }
 
     private fun extractSection(text: String, start: String, end: String?): String {
@@ -349,6 +311,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
         )
     )
 
+    @RequiresApi(Build.VERSION_CODES.R)
     fun execute(
         actionStr: String,
         infoPool: InfoPool,

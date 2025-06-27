@@ -6,42 +6,20 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.*
 import android.provider.Settings
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.speech.tts.TextToSpeech
-import android.speech.tts.TextToSpeech.OnInitListener
 import android.text.TextUtils
 import android.util.Log
 import android.widget.*
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-//import com.example.blurr.agent.ActionReflector
-//import com.example.blurr.agent.ClickableInfo
-//import com.example.blurr.agent.InfoPool
-//import com.example.blurr.agent.Judge
-//import com.example.blurr.agent.Manager
-//import com.example.blurr.agent.Notetaker
-//import com.example.blurr.agent.Operator
-//import com.example.blurr.agent.addResponse
-//import com.example.blurr.agent.addResponsePrePost
-//import com.example.blurr.agent.atomicActionSignatures
-//import com.example.blurr.agent.getReasoningModelApiResponse
-//import com.example.blurr.agent.shortcut.ReflectorShortCut
-//import com.example.blurr.agent.tips.ReflectorTips
-import com.example.blurr.databinding.ActivityMainBinding
+import com.example.blurr.agent.Judge
+import com.example.blurr.utilities.addResponse
+import com.example.blurr.utilities.getReasoningModelApiResponse
 import com.example.blurr.service.Eyes
-import com.example.blurr.service.EyesController
-//import com.example.blurr.service.Retina
-//import com.example.blurr.service.Eyes
-//import com.example.blurr.service.Finger
-//import com.example.blurr.utilities.Persistent
-//import com.example.blurr.utilities.TTSManager
+import com.example.blurr.service.Finger
+import com.example.blurr.utilities.TTSManager
 import kotlinx.coroutines.*
-import org.json.JSONObject
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.*
 
 
 class MainActivity : AppCompatActivity() {
@@ -60,9 +38,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvServiceStatus: TextView
 
     private lateinit var speechRecognizer: SpeechRecognizer
-//    private lateinit var binding: ActivityMainBinding
 
-    @RequiresApi(Build.VERSION_CODES.O)
+    @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
 
         super.onCreate(savedInstanceState)
@@ -84,18 +61,6 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        startAgent.setOnClickListener {
-            println("btnStartService")
-            val eyes = Eyes(this)
-            eyes.captureScreenshot()
-            eyes.captureLayout()
-
-//            startAgentService()
-        }
-        stopAgent.setOnClickListener {
-            stopAgentService()
-        }
-
         handler = Handler(Looper.getMainLooper())
 
         performTaskButton.setOnClickListener {
@@ -104,93 +69,69 @@ class MainActivity : AppCompatActivity() {
 //            handleUserInput(this, userInput, statusText)
         }
 
-        contentModerationButton.setOnClickListener {
+      contentModerationButton.setOnClickListener {
             val contentModerationInput = contentModerationInputField.text.toString()
             println("contentModerationInput: $contentModerationInput")
-//            val fin = Finger()
-//            fin.home()
+            val fin = Finger(this)
+            fin.home()
+
 
             runnable = object : Runnable {
                 override fun run() {
                     // Call the content moderation function here
-//                    contentModeration(this@MainActivity, contentModerationInput)
+                    contentModeration(this@MainActivity, contentModerationInput)
                     Log.d("MainActivity", "Function called every 2 seconds")
                     handler.postDelayed(this, 20000) // Schedule the runnable again after 2 seconds
                 }
             }
             handler.post(runnable)
         }
-
-    }
-
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun startAgentService() {
-        println("startAgentService")
-        val intent = Intent(this, AgentService::class.java)
-        startForegroundService(intent)
-        updateUI()
-    }
-
-    private fun stopAgentService() {
-        val intent = Intent(this, AgentService::class.java)
-        stopService(intent)
-        updateUI()
-    }
-    @SuppressLint("SetTextI18n")
-    private fun updateUI() {
-        val isPermissionGranted = isAccessibilityServiceEnabled()
-        val isServiceRunning = AgentService.isRunning
-
-        tvPermissionStatus.text = if (isPermissionGranted) "Permission: Granted" else "Permission: Not Granted"
-        tvPermissionStatus.setTextColor(if (isPermissionGranted) Color.GREEN else Color.RED)
-
-        startAgent.isEnabled = isPermissionGranted && !isServiceRunning
-        stopAgent.isEnabled = isPermissionGranted && isServiceRunning
-//        tv_service_status
-        tvServiceStatus.text = "Service Status: ${if (isServiceRunning) "Running" else "Stopped"}"
     }
 
 
-//
-//    // Content moderation function to check content every 2 seconds
-//    private fun contentModeration(context: Context, inst: String) {
-//        CoroutineScope(Dispatchers.IO).launch {
-//            val tts = TTSManager(context)
-//
-//            val startTime = System.currentTimeMillis()
-//            val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
-//            val finger = Finger()
-//            val eyes = Eyes(context)
-//            eyes.openXMLEyes()
-//            eyes.openEyes()
-//
-//            val pageXML = eyes.getWindowDumpFile().readText()
-//            println(pageXML)
-//            val judge = Judge()
-//            val init = judge.initChat()
-//            val pro = judge.getPrompt(inst, pageXML, true)
-//            val combined = addResponse("user", pro, init, eyes.getScreenshotFile())
-//
-//            val output = getReasoningModelApiResponse(combined, apiKey = API_KEY)
-//            val parsed = judge.parseResponse(output)
-//
-//            println("JUDGEMENT: ${parsed["judgement"]}")
-//            println("REASON: ${parsed["reason"]}")
-//
-//            // Check if content is rejected
-//            if (parsed["judgement"]?.isNotEmpty() == true && parsed["judgement"]?.uppercase() == "B") {
-//                try {
-//                    // Suspend until TTS is initialized, then speak
-//                    tts.speakText(parsed["reason"].toString())
-//                } catch (e: Exception) {
-//                    // Handle any initialization errors
-//                    println("Error: ${e.message}")
-//                }
-//                finger.goToChatRoom(parsed["reason"].toString().replace("\"", ""))
-//            }
-//            println(System.currentTimeMillis() - startTime)
-//        }
-//    }
+
+
+    // Content moderation function to check content every 2 seconds
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun contentModeration(context: Context, inst: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            println("contentModeration started")
+            val tts = TTSManager(context)
+
+            val startTime = System.currentTimeMillis()
+            val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
+            val finger = Finger(context)
+            val eyes = Eyes(context)
+            eyes.openXMLEyes()
+            eyes.openEyes()
+
+            val pageXML = eyes.getWindowDumpFile().readText()
+            println(pageXML)
+            val judge = Judge()
+            val init = judge.initChat()
+            val pro = judge.getPrompt(inst, pageXML, true)
+            val combined = addResponse("user", pro, init, eyes.getScreenshotFile())
+
+            val output = getReasoningModelApiResponse(combined, apiKey = API_KEY)
+            val parsed = judge.parseResponse(output)
+
+            println("JUDGEMENT: ${parsed["judgement"]}")
+            println("REASON: ${parsed["reason"]}")
+
+            // Check if content is rejected
+            if (parsed["judgement"]?.isNotEmpty() == true && parsed["judgement"]?.uppercase() == "B") {
+                try {
+                    // Suspend until TTS is initialized, then speak
+                    tts.speakText(parsed["reason"].toString())
+                } catch (e: Exception) {
+                    // Handle any initialization errors
+                    println("Error: ${e.message}")
+                }
+                finger.goToChatRoom(parsed["reason"].toString().replace("\"", ""))
+            }
+            println(System.currentTimeMillis() - startTime)
+        }
+    }
 
 
     fun appendToFile(file: File, content: String) {
@@ -655,4 +596,17 @@ class MainActivity : AppCompatActivity() {
         }
         return false
     }
+    @SuppressLint("SetTextI18n")
+    private fun updateUI() {
+        val isPermissionGranted = isAccessibilityServiceEnabled()
+        val isServiceRunning = AgentService.isRunning
+
+        tvPermissionStatus.text = if (isPermissionGranted) "Permission: Granted" else "Permission: Not Granted"
+        tvPermissionStatus.setTextColor(if (isPermissionGranted) Color.GREEN else Color.RED)
+
+        startAgent.isEnabled = isPermissionGranted && !isServiceRunning
+        stopAgent.isEnabled = isPermissionGranted && isServiceRunning
+        tvServiceStatus.text = "Service Status: ${if (isServiceRunning) "Running" else "Stopped"}"
+    }
+
 }

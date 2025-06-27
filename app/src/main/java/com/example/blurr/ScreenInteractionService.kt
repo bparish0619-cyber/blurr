@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.Path
 import android.hardware.HardwareBuffer
 import android.os.Build
+import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
@@ -22,6 +23,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 import android.util.Xml
+import android.view.accessibility.AccessibilityNodeInfo
 import org.xmlpull.v1.XmlSerializer
 import java.io.IOException
 
@@ -129,29 +131,94 @@ class ScreenInteractionService : AccessibilityService() {
         dispatchGesture(gesture, null, null)
     }
 
+    /**
+     * Performs a swipe gesture on the screen.
+     * @param duration The time in milliseconds the swipe should take.
+     */
+    fun swipe(x1: Float, y1: Float, x2: Float, y2: Float, duration: Long) {
+        val path = Path()
+        path.moveTo(x1, y1)
+        path.lineTo(x2, y2)
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, duration))
+            .build()
 
+        dispatchGesture(gesture, null, null)
+    }
+
+    /**
+     * Types the given text into the currently focused editable field.
+     */
+    fun typeTextInFocusedField(textToType: String) {
+        // Find the node that currently has input focus
+        val focusedNode = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+
+        if (focusedNode != null && focusedNode.isEditable) {
+            val arguments = Bundle()
+            // To append text rather than replacing it, we get existing text first
+            val existingText = focusedNode.text ?: ""
+            val newText = existingText.toString() + textToType
+
+            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
+            focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+        } else {
+            Log.e("InteractionService", "Could not find a focused editable field to type in.")
+        }
+    }
+
+    /**
+     * Triggers the 'Back' button action.
+     */
+    fun performBack() {
+        performGlobalAction(GLOBAL_ACTION_BACK)
+    }
+
+    /**
+     * Triggers the 'Home' button action.
+     */
+    fun performHome() {
+        performGlobalAction(GLOBAL_ACTION_HOME)
+    }
+
+    /**
+     * Triggers the 'App Switch' (Recents) action.
+     */
+    fun performRecents() {
+        performGlobalAction(GLOBAL_ACTION_RECENTS)
+    }
+
+    /**
+     * Simulates an 'Enter' key press on the focused element.
+     */
+    fun performEnter() {
+        val focusedNode = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (focusedNode != null) {
+            // A simple click often works for 'Enter' on buttons or submitting forms
+            focusedNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        } else {
+            Log.e("InteractionService", "Could not find a focused node to 'Enter' on.")
+        }
+    }
+
+
+    // The callback now provides the Bitmap directly
     @RequiresApi(Build.VERSION_CODES.R)
-    fun captureScreenshot(outputFile: File) { // <-- MODIFIED: Now accepts a File
+    fun captureScreenshot(onComplete: (Bitmap) -> Unit) { // MODIFIED: Callback provides Bitmap
         takeScreenshot(0, executor, @RequiresApi(Build.VERSION_CODES.R)
         object : TakeScreenshotCallback {
             override fun onSuccess(screenshot: ScreenshotResult) {
-                Log.d("InteractionService", "Screenshot successful")
                 val hardwareBuffer = screenshot.hardwareBuffer
                 val colorSpace = screenshot.colorSpace
-
                 if (hardwareBuffer != null) {
                     val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
                     if (bitmap != null) {
-                        // Pass the outputFile to the save function
-                        saveBitmapToFile(bitmap, outputFile)
+                        // Call the callback immediately with the bitmap data
+                        onComplete(bitmap)
                     }
-                    hardwareBuffer.close() // VERY IMPORTANT
+                    hardwareBuffer.close()
                 }
             }
-
-            override fun onFailure(errorCode: Int) {
-                Log.e("InteractionService", "Screenshot failed with error code: $errorCode")
-            }
+            override fun onFailure(errorCode: Int) { /* ... */ }
         })
     }
 
