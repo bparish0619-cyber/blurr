@@ -22,10 +22,10 @@ suspend fun <T> withRetry(
             return block()
         } catch (e: IOException) {
             lastException = e
-            println("❌ Network error on attempt $attempt: ${e.message}")
+            println("❌ Network error on attempt $attempt: ${e.printStackTrace()}")
         } catch (e: SocketTimeoutException) {
             lastException = e
-            println("⏱️ Timeout on attempt $attempt: ${e.message}")
+            println("⏱️ Timeout on attempt $attempt: ${e}")
         }
 
         // If we are not on the last attempt, wait before retrying.

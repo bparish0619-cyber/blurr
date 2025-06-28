@@ -1,27 +1,20 @@
 package com.example.blurr.api
 
 import android.content.Context
-import android.graphics.BitmapFactory
-import android.util.Base64
 import com.example.blurr.agent.ClickableInfo
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 import java.util.concurrent.TimeUnit
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.example.blurr.utilities.ImageHelper
 import com.example.blurr.utilities.withRetry
 import java.io.ByteArrayOutputStream
-import java.io.FileOutputStream
 import java.io.IOException
 
 class Retina(
@@ -169,38 +162,11 @@ class Retina(
         Only output such a JSON array. Any extra formatting or explanation will cause failure in parsing.
         """.trimIndent()
 
-    fun sanitizeJsonArray(input: String): JSONArray {
-        val sanitized = input
-            .replace("```json", "")
-            .replace("```", "")
-            .replace("\n", "")
-            .replace("\r", "")
-            .trim()
-
-        return try {
-            // Try to parse the full array first
-            JSONArray(sanitized)
-        } catch (e: Exception) {
-            // Try to fix broken arrays by extracting valid objects manually
-            val fixedArray = JSONArray()
-            val regex = Regex("""\{.*?"label"\s*:\s*".+?",\s*"box_2d"\s*:\s*\[.*?]}\s*""")
-            regex.findAll(sanitized).forEach { match ->
-                try {
-                    fixedArray.put(JSONObject(match.value))
-                } catch (_: Exception) { /* skip malformed entries */ }
-            }
-            fixedArray
-        }
-    }
-    
     @RequiresApi(Build.VERSION_CODES.R)
-    suspend fun getPerceptionInfos(context: Context?): Quadruple<List<ClickableInfo>, Int, Int, Boolean> {
-        val bitmap = eyes.openEyes()
-        if (bitmap == null) {
-            println("Failed to get screenshot")
-            return Quadruple(emptyList(), 0, 0, false)
+    suspend fun getPerceptionInfos(context: Context?, bitmap: Bitmap?): Quadruple<List<ClickableInfo>, Int, Int, Boolean> {
+        if (bitmap == null ){
+            return Quadruple(emptyList(), 0, 0, true)
         }
-
         val width = bitmap.width
         val height = bitmap.height
         val clickableInfos = mutableListOf<ClickableInfo>()

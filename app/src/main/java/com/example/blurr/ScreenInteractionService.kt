@@ -16,11 +16,14 @@ import java.io.FileOutputStream
 import java.io.OutputStream
 import java.util.concurrent.Executors
 import android.util.Xml
+import android.view.Display
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlSerializer
 import java.io.StringWriter
+import kotlin.coroutines.resumeWithException
 
 
 class ScreenInteractionService : AccessibilityService() {
@@ -201,35 +204,78 @@ class ScreenInteractionService : AccessibilityService() {
             Log.e("InteractionService", "Could not find a focused node to 'Enter' on.")
         }
     }
-
-
-    // Replace the old captureScreenshot(onComplete:...) with this new suspend function
+    /**
+     * Asynchronously captures a screenshot from an AccessibilityService in a safe and reliable way.
+     * This function follows the "Strict Librarian" rule: it always closes the screenshot resource
+     * after use to prevent leaks and allow subsequent screenshots to succeed.
+     *
+     * @return A nullable Bitmap. Returns the screenshot Bitmap on success, or null if any part of the process fails.
+     */
     @RequiresApi(Build.VERSION_CODES.R)
-    suspend fun captureScreenshot(): Bitmap = suspendCancellableCoroutine { continuation ->
-        takeScreenshot(0, executor, @RequiresApi(Build.VERSION_CODES.R)
-        object : TakeScreenshotCallback {
-            override fun onSuccess(screenshot: ScreenshotResult) {
-                val hardwareBuffer = screenshot.hardwareBuffer
-                val colorSpace = screenshot.colorSpace
-                if (hardwareBuffer != null) {
-                    val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
-                    if (bitmap != null) {
-                        // Resume the coroutine with the successful result
-                        continuation.resume(bitmap)
-                    } else {
-                        continuation.resumeWith(Result.failure(Exception("Failed to wrap hardware buffer")))
-                    }
-                    hardwareBuffer.close()
-                } else {
-                    continuation.resumeWith(Result.failure(Exception("Screenshot hardware buffer was null")))
-                }
-            }
+    suspend fun captureScreenshot(): Bitmap? {
+        // A top-level try-catch block ensures that no matter what fails inside the coroutine,
+        // the app will not crash. It will log the error and return null.
+        return try {
+            // suspendCancellableCoroutine is the standard way to wrap a modern callback-based
+            // Android API into a clean, suspendable coroutine.
+            suspendCancellableCoroutine { continuation ->
+                // The executor ensures the result callbacks happen on the main UI thread,
+                // which is a requirement for many UI-related APIs.
+                val executor = ContextCompat.getMainExecutor(this)
 
-            override fun onFailure(errorCode: Int) {
-                // Resume the coroutine with an exception
-                continuation.resumeWith(Result.failure(Exception("Screenshot failed with error code: $errorCode")))
+                // STEP 1: Ask the "Librarian" (Android OS) to check out the "book" (Screenshot).
+                takeScreenshot(
+                    Display.DEFAULT_DISPLAY,
+                    executor,
+                    object : TakeScreenshotCallback {
+
+                        // This block is called if the system successfully grants us the screenshot buffer.
+                        override fun onSuccess(screenshotResult: ScreenshotResult) {
+                            // The HardwareBuffer is the actual low-level resource. It's the "special book".
+                            val hardwareBuffer = screenshotResult.hardwareBuffer
+
+                            if (hardwareBuffer == null) {
+                                // If, for some reason, the buffer is null even on success, fail gracefully.
+                                continuation.resumeWithException(Exception("Screenshot hardware buffer was null."))
+                                return
+                            }
+
+                            // STEP 2: "Photocopy the book" by wrapping the HardwareBuffer into a standard Bitmap.
+                            // We make a mutable copy so we can work with it after closing the original buffer.
+                            val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, screenshotResult.colorSpace)
+                                ?.copy(Bitmap.Config.ARGB_8888, false)
+
+                            // STEP 3: THIS IS THE MOST IMPORTANT STEP.
+                            // "Return the book to the librarian." We immediately close the original HardwareBuffer
+                            // to release the system resource. This allows the *next* screenshot call to succeed.
+                            hardwareBuffer.close()
+
+                            // STEP 4: Give the "photocopy" (the Bitmap) back to our agent.
+                            if (bitmap != null) {
+                                // If the bitmap was created successfully, resume the coroutine with the result.
+                                continuation.resume(bitmap)
+                            } else {
+                                // If bitmap creation failed, resume with an error.
+                                continuation.resumeWithException(Exception("Failed to wrap hardware buffer into a Bitmap."))
+                            }
+                        }
+
+                        // This block is called if the "Librarian" denies our request for any reason.
+                        override fun onFailure(errorCode: Int) {
+                            // We don't crash the app. We just tell the coroutine that it failed,
+                            // which will be caught by our top-level try-catch block.
+                            continuation.resumeWithException(Exception("Screenshot failed with error code: $errorCode"))
+                        }
+                    }
+                )
             }
-        })
+        } catch (e: Exception) {
+            // Any exception from resumeWithException will be caught here.
+            // We log the full error with its stack trace for easy debugging.
+            Log.e("ScreenshotUtil", "Screenshot capture failed", e)
+            // We return null to the caller, signaling that the operation did not succeed.
+            null
+        }
     }
 
     private fun saveBitmapToFile(bitmap: Bitmap, file: File) {

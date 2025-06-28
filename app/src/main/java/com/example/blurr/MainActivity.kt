@@ -23,6 +23,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.example.blurr.api.Eyes
+import com.example.blurr.api.Quadruple
 import java.text.SimpleDateFormat
 
 class MainActivity : AppCompatActivity() {
@@ -71,7 +74,7 @@ class MainActivity : AppCompatActivity() {
         performTaskButton = findViewById(R.id.performTaskButton)
         contentModerationButton = findViewById(R.id.contentMoniterButton)
 
-
+        setupClickListeners()
         grantPermission.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             startActivity(intent)
@@ -79,55 +82,53 @@ class MainActivity : AppCompatActivity() {
 
         handler = Handler(Looper.getMainLooper())
 
-        performTaskButton.setOnClickListener {
-            val userInput = inputField.text.toString()
-
-//            handleUserInput(this, userInput, statusText)
-        }
-
-//      contentModerationButton.setOnClickListener {
-//            val contentModerationInput = contentModerationInputField.text.toString()
-//            println("contentModerationInput: $contentModerationInput")
+//        performTaskButton.setOnClickListener {
+//            val instruction = inputField.text.toString()
 //            val fin = Finger(this)
 //            fin.home()
 //            Thread.sleep(1000)
+//            if (instruction.isNotBlank()) {
+//                Log.d("MainActivity", "Requesting to start ContentModerationService.")
 //
-//            runnable = object : Runnable {
-//                override fun run() {
-//                    // Call the content moderation function here
-//                    CoroutineScope(Dispatchers.IO).launch {
-//                     contentModeration(this@MainActivity, contentModerationInput)
-//                    }
-//                    Log.d("MainActivity", "Function called every 2 seconds")
-//                    handler.postDelayed(this, 8000) // Schedule the runnable again after 2 seconds
+//                // Create an Intent to target our new service
+//                val serviceIntent = Intent(this, AgentTaskService::class.java).apply {
+//                    // Pass the user's instruction to the service
+//                    putExtra("TASK_INSTRUCTION", instruction)
 //                }
+//
+//                // Use startService() to start it
+//                startService(serviceIntent)
+//                updateUI() // Update button states
+//                Toast.makeText(this, "Agent Task Started", Toast.LENGTH_SHORT).show()
+//            } else {
+//                Toast.makeText(this, "Please enter an instruction", Toast.LENGTH_SHORT).show()
 //            }
-//            handler.post(runnable)
+////            handleUserInput(this, userInput, statusText)
 //        }
-
-        // --- START THE SERVICE ---
-        contentModerationButton.setOnClickListener {
-            val instruction = contentModerationInputField.text.toString()
-            val fin = Finger(this)
-            fin.home()
-            Thread.sleep(1000)
-            if (instruction.isNotBlank()) {
-                Log.d("MainActivity", "Requesting to start ContentModerationService.")
-
-                // Create an Intent to target our new service
-                val serviceIntent = Intent(this, ContentModerationService::class.java).apply {
-                    // Pass the user's instruction to the service
-                    putExtra("MODERATION_INSTRUCTION", instruction)
-                }
-
-                // Use startService() to start it
-                startService(serviceIntent)
-                updateUI() // Update button states
-                Toast.makeText(this, "Content Moderation Started", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Please enter an instruction", Toast.LENGTH_SHORT).show()
-            }
-        }
+//
+//        // --- START THE SERVICE ---
+//        contentModerationButton.setOnClickListener {
+//            val instruction = contentModerationInputField.text.toString()
+//            val fin = Finger(this)
+//            fin.home()
+//            Thread.sleep(1000)
+//            if (instruction.isNotBlank()) {
+//                Log.d("MainActivity", "Requesting to start ContentModerationService.")
+//
+//                // Create an Intent to target our new service
+//                val serviceIntent = Intent(this, ContentModerationService::class.java).apply {
+//                    // Pass the user's instruction to the service
+//                    putExtra("MODERATION_INSTRUCTION", instruction)
+//                }
+//
+//                // Use startService() to start it
+//                startService(serviceIntent)
+//                updateUI() // Update button states
+//                Toast.makeText(this, "Content Moderation Started", Toast.LENGTH_SHORT).show()
+//            } else {
+//                Toast.makeText(this, "Please enter an instruction", Toast.LENGTH_SHORT).show()
+//            }
+//        }
 
 //        // --- STOP THE SERVICE ---
 //        stopModerationButton.setOnClickListener {
@@ -144,6 +145,62 @@ class MainActivity : AppCompatActivity() {
         file.appendText(content + "\n")
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun setupClickListeners() {
+        performTaskButton.setOnClickListener {
+            // Launch a coroutine to handle the task without blocking the UI
+            lifecycleScope.launch {
+                val instruction = inputField.text.toString()
+                if (instruction.isBlank()) {
+                    Toast.makeText(this@MainActivity, "Please enter an instruction", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                Log.d("MainActivity", "Starting AgentTaskService after delay.")
+                val serviceIntent = Intent(this@MainActivity, AgentTaskService::class.java).apply {
+                    putExtra("TASK_INSTRUCTION", instruction)
+                }
+                startService(serviceIntent)
+//
+//                // 1. Go to the home screen
+//                val fin = Finger(this@MainActivity)
+//                fin.home()
+//
+//                // 2. Wait for 1.5 seconds (non-blocking) for the UI to settle
+//                delay(1500)
+//
+//                // 3. Now, start the service when the UI is stable
+//
+//                updateUI()
+                Toast.makeText(this@MainActivity, "Agent Task Started", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        contentModerationButton.setOnClickListener {
+            // You should apply the same fix here!
+            lifecycleScope.launch {
+                val instruction = contentModerationInputField.text.toString()
+                if (instruction.isBlank()) {
+                    Toast.makeText(this@MainActivity, "Please enter an instruction", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                val fin = Finger(this@MainActivity)
+                fin.home()
+
+                delay(1500)
+
+                Log.d("MainActivity", "Starting ContentModerationService after delay.")
+                val serviceIntent = Intent(this@MainActivity, ContentModerationService::class.java).apply {
+                    putExtra("MODERATION_INSTRUCTION", instruction)
+                }
+                startService(serviceIntent)
+
+                updateUI()
+                Toast.makeText(this@MainActivity, "Content Moderation Started", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
 //    private fun handleUserInput(context: Context, inputText: String, statusText: TextView) {
 //        CoroutineScope(Dispatchers.IO).launch {

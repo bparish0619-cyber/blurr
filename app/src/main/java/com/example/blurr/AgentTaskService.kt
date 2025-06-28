@@ -1,6 +1,5 @@
 package com.example.blurr
 
-import android.app.Notification
 import android.app.Service
 import android.content.Intent
 import android.graphics.Bitmap
@@ -8,7 +7,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresApi
-import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.delay
 import com.example.blurr.agent.ActionReflector
 import com.example.blurr.agent.ClickableInfo
 import com.example.blurr.agent.InfoPool
@@ -47,19 +46,12 @@ class AgentTaskService : Service() {
 
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val inputText = intent?.getStringExtra("USER_INPUT")
+        val inputText = intent?.getStringExtra("TASK_INSTRUCTION")
         if (inputText == null) {
             Log.e("AgentTaskService", "Service started without user input. Stopping.")
             stopSelf()
             return START_NOT_STICKY
         }
-
-        val notification: Notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("Agent Task Running")
-            .setContentText("Processing your request: $inputText")
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .build()
-        startForeground(NOTIFICATION_ID, notification)
 
         Log.d("AgentTaskService", "Starting agent task with input: $inputText")
 
@@ -80,11 +72,9 @@ class AgentTaskService : Service() {
 
     @RequiresApi(Build.VERSION_CODES.R)
     private suspend fun runAgentLogic(inputText: String) {
+            delay(2000)
 
-            val taskStartTime = System.currentTimeMillis()
-            val finger = Finger(this)
-            finger.home()
-            Thread.sleep((500))
+        val taskStartTime = System.currentTimeMillis()
             val context = this
             val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
 
@@ -98,10 +88,13 @@ class AgentTaskService : Service() {
             val logDir = File(context.filesDir, "logs/mobile_agent_E/test/$timestamp").apply { mkdirs() }
             val screenshotsDir = File(logDir, "screenshots").apply { mkdirs() }
 
+            //NOTE LIMITED RESOURCE, YOUR CAREFULLY, for more info read about Hardware Buffer
             val eyes = Eyes(context)
+
             val retina = Retina(context, eyes, API_KEY)
             val infoPool = InfoPool()
             val persistent = Persistent()
+            val finger = Finger(context)
 
             val manager = Manager()
             val operator = Operator(finger)
@@ -128,9 +121,9 @@ class AgentTaskService : Service() {
 
             appendToFile(taskLog, "{step: 0, operation: init, instruction: $inputText, maxItr: $maxItr }")
 
-            var screenshotFile: Bitmap? = eyes.openEyes()
-            var postScreenshotFile: Bitmap?
-            var xmlMode = false
+        var screenshotFile = eyes.openEyes()
+        var postScreenshotFile: Bitmap?
+            var xmlMode = true
             while (true) {
                 iteration++
 
@@ -195,7 +188,7 @@ class AgentTaskService : Service() {
 //                    screenshotFile.copyTo(screenshotPath, overwrite = true)
 //                    val lastScreenshotFile = screenshotPath // Store for potential removal
                     val (perceptionInfos, width, height, keyboardOn) = retina.getPerceptionInfos(
-                        context
+                        context, screenshotFile
                     )
                     infoPool.width = width
                     infoPool.height = height
@@ -210,7 +203,12 @@ class AgentTaskService : Service() {
                     infoPool.keyboardPre = keyboardOn
                     if (xmlMode){
                         val xml = eyes.openXMLEyes()
+                        println(xml)
                         infoPool.perceptionInfosPreXML = xml
+                    }
+                    if(perceptionInfos.isEmpty()) {
+//                        println(bitmap)
+                        return
                     }
                     infoPool.perceptionInfosPre = perceptionInfos as MutableList<ClickableInfo>
 
@@ -375,7 +373,7 @@ class AgentTaskService : Service() {
 //               Step 4 : Take the Perception after the action by operator has been performed
                 val perceptionPostStartTime = System.currentTimeMillis()
                 postScreenshotFile = eyes.openEyes()
-                val (postPerceptionInfos, _, _, keyBoardOnPost) = retina.getPerceptionInfos(context)
+                val (postPerceptionInfos, _, _, keyBoardOnPost) = retina.getPerceptionInfos(context, screenshotFile)
                 val perceptionPostEndTime = System.currentTimeMillis()
                 appendToFile(taskLog, "{step: $iteration, operation: perception_post, screenshot: NUll, perception_infos: ${postPerceptionInfos.forEach { (text, coordinates) -> println("Text: $text, Coordinates: $coordinates \n") }}, duration: ${(perceptionPostEndTime - perceptionPostStartTime)/1000} seconds}")
                 infoPool.perceptionInfosPost = postPerceptionInfos as MutableList<ClickableInfo>
