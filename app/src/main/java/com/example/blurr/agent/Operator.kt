@@ -1,8 +1,8 @@
 package com.example.blurr.agent
 
 import android.content.Context
-import com.example.blurr.service.Eyes
-import com.example.blurr.service.Finger
+import com.example.blurr.api.Eyes
+import com.example.blurr.api.Finger
 import com.google.ai.client.generativeai.type.TextPart
 import java.io.File
 import android.graphics.Bitmap
@@ -10,8 +10,9 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.os.Build
+import androidx.annotation.RequiresApi
 import com.example.blurr.agent.Operator.ShortcutStep
-import com.example.blurr.utilities.JsonExtraction
 import java.io.FileOutputStream
 import kotlin.math.min
 
@@ -63,42 +64,6 @@ class Operator(private val finger: Finger) : BaseAgent() {
             Your goal is to choose the correct actions to complete the user's instruction.
             Think as if you are a human user operating the phone.
         """.trimIndent()
-
-//        val systemPromptv2 = """
-//            You are a UI automation agent responsible for selecting and executing the next best action on a mobile phone screen.
-//
-//            Your goal is to analyze the current screen context, understand the user’s goal, and choose a valid atomic action or shortcut that brings the user closer to their objective.
-//
-//            ## NOTE ##
-//            - If you need to tap the search bar or icon try looking for Magnifying Glass icon. Generally it is used for search.
-//            - Make sure to add a magnifying glass and label it as search. It is generally used for search.
-//            - Only return the JSON array. Do not include any explanation, markdown, or code formatting.
-//            - Do not include text outside of the JSON array. Do not use markdown, do not wrap in code blocks, and do not use ellipsis. [Sometime when parsing time, it give json parse error, example 6:23am]
-//
-//            Guidelines:
-//            - Think like a real user: imagine tapping, typing, swiping, or navigating based on what is visible on the screen.
-//            - Instead taping every key when keyboard is open, use the Action Type.
-//            - Only choose actions that are feasible given the visible UI elements.
-//            - Use shortcuts when they are applicable to speed up common tasks.
-//            - Use accurate pixel coordinates for actions such as 'Tap' or 'Swipe'.
-//            - You may use available shortcuts, but you must ensure the preconditions are satisfied.
-//            - Don't click on Logos, if you want search, just stick to the search bar/icons.
-//            - If you see a keyboard on the screen, and your goals are to type, just start typing instead of enabling the input text box (Keyboard means the inputbox enabled)
-//
-//            Output format:
-//            Return the action in strict JSON format:
-//            {
-//              "name": "ActionName",
-//              "arguments": {
-//                "arg1": value1,
-//                "arg2": value2
-//              }
-//            }
-//
-//            Do not return any explanation or extra formatting (like Markdown code blocks)
-//            BAD -> ```json{"name": "Tap", "arguments": {"x": 1356, "y": 89}}```
-//            GOOD -> {"name": "Tap", "arguments": {"x": 1356, "y": 89}}
-//        """.trimIndent()
 
         return listOf("user" to listOf(TextPart(systemPrompt)))
     }
@@ -272,54 +237,50 @@ class Operator(private val finger: Finger) : BaseAgent() {
 
         if (name.lowercase() != "wait") Thread.sleep(3000)
     }
-
-    fun logActionOnScreenshot(action: String, args: Map<*, *>, context: Context) {
-
-        val eyes = Eyes(context)
-        val screenshotFile = eyes.getScreenshotFile()
-
-        val bitmap = BitmapFactory.decodeFile(screenshotFile.absolutePath)
-            .copy(Bitmap.Config.ARGB_8888, true)
-
-        val canvas = Canvas(bitmap)
-        val paint = Paint().apply {
-            color = Color.RED
-            style = Paint.Style.FILL
-            textSize = 40f
-        }
-
-        when (action.lowercase()) {
-            "tap" -> {
-                val x = (args["x"] as? Number)?.toInt() ?: return
-                val y = (args["y"] as? Number)?.toInt() ?: return
-                canvas.drawCircle(x.toFloat(), y.toFloat(), 30f, paint)
-                canvas.drawText("TAP", x + 35f, y.toFloat(), paint)
-            }
-            "swipe" -> {
-                val x1 = (args["x1"] as? Number)?.toFloat() ?: return
-                val y1 = (args["y1"] as? Number)?.toFloat() ?: return
-                val x2 = (args["x2"] as? Number)?.toFloat() ?: return
-                val y2 = (args["y2"] as? Number)?.toFloat() ?: return
-                paint.strokeWidth = 8f
-                canvas.drawLine(x1, y1, x2, y2, paint)
-                canvas.drawText("SWIPE", x1 + 10f, y1 - 10f, paint)
-            }
-            else -> return
-        }
-        val logDir = File(context.filesDir, "actionLogs")
-        logDir.mkdirs()
-        val timestamp = System.currentTimeMillis()
-        val logFile = File(logDir, "action_$timestamp.jpg")
-        FileOutputStream(logFile).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
-        }
-        println("Logging of actionInfo saved in data/data/com.example.blurr/files/actionLogs/action_$timestamp.jpg")
-
-//        filePath.parentFile?.mkdirs()
-//        FileOutputStream(filePath).use { out ->
-//            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+//
+//    fun logActionOnScreenshot(action: String, args: Map<*, *>, context: Context) {
+//
+//        val eyes = Eyes(context)
+//        val screenshotFile = eyes.getScreenshotFile()
+//
+//        val bitmap = BitmapFactory.decodeFile(screenshotFile?.absolutePath)
+//            .copy(Bitmap.Config.ARGB_8888, true)
+//
+//        val canvas = Canvas(bitmap)
+//        val paint = Paint().apply {
+//            color = Color.RED
+//            style = Paint.Style.FILL
+//            textSize = 40f
 //        }
-    }
+//
+//        when (action.lowercase()) {
+//            "tap" -> {
+//                val x = (args["x"] as? Number)?.toInt() ?: return
+//                val y = (args["y"] as? Number)?.toInt() ?: return
+//                canvas.drawCircle(x.toFloat(), y.toFloat(), 30f, paint)
+//                canvas.drawText("TAP", x + 35f, y.toFloat(), paint)
+//            }
+//            "swipe" -> {
+//                val x1 = (args["x1"] as? Number)?.toFloat() ?: return
+//                val y1 = (args["y1"] as? Number)?.toFloat() ?: return
+//                val x2 = (args["x2"] as? Number)?.toFloat() ?: return
+//                val y2 = (args["y2"] as? Number)?.toFloat() ?: return
+//                paint.strokeWidth = 8f
+//                canvas.drawLine(x1, y1, x2, y2, paint)
+//                canvas.drawText("SWIPE", x1 + 10f, y1 - 10f, paint)
+//            }
+//            else -> return
+//        }
+//        val logDir = File(context.filesDir, "actionLogs")
+//        logDir.mkdirs()
+//        val timestamp = System.currentTimeMillis()
+//        val logFile = File(logDir, "action_$timestamp.jpg")
+//        FileOutputStream(logFile).use { out ->
+//            bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+//        }
+//        println("Logging of actionInfo saved in data/data/com.example.blurr/files/actionLogs/action_$timestamp.jpg")
+//
+//    }
 
     private fun extractSection(text: String, start: String, end: String?): String {
         val startIndex = text.indexOf(start)
@@ -349,7 +310,8 @@ class Operator(private val finger: Finger) : BaseAgent() {
         )
     )
 
-    fun execute(
+    @RequiresApi(Build.VERSION_CODES.R)
+    suspend fun execute(
         actionStr: String,
         infoPool: InfoPool,
         context: Context,
@@ -394,7 +356,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
                             "y" to clickableInfo.coordinates.second
                         )
                         executeAtomicAction("Tap", tapArgs, context)
-                        logActionOnScreenshot("Tap", tapArgs, context)
+//                        logActionOnScreenshot("Tap", tapArgs, context)
                         return Triple(actionObj, 1, null)
                 }
                     if (appName in listOf("Fandango", "Walmart", "Best Buy")) {
@@ -404,7 +366,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
                 Thread.sleep(10000)
             } else {
                 executeAtomicAction(name, arguments, context)
-                logActionOnScreenshot(name, arguments, context)
+//                logActionOnScreenshot(name, arguments, context)
             }
             return Triple(actionObj, 1, null)
         }
@@ -429,9 +391,9 @@ class Operator(private val finger: Finger) : BaseAgent() {
                     println("\t Executing sub-step $i: $atomicActionName $atomicActionArgs ...")
                     executeAtomicAction(atomicActionName, atomicActionArgs, context)
 
-                    logActionOnScreenshot(atomicActionName, atomicActionArgs, context)
-                    val eyes = Eyes(context)
-                    eyes.openEyes()
+//                    logActionOnScreenshot(atomicActionName, atomicActionArgs, context)
+//                    val eyes = Eyes(context)
+//                    eyes.openEyes()
                     Thread.sleep(800)
                 }
                 return Triple(actionObj, shortcut.atomicActionSequence.size, null)

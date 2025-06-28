@@ -1,10 +1,16 @@
 package com.example.blurr.utilities
 
+import android.graphics.Bitmap
+import android.os.Environment
+import android.util.Log
 import com.example.blurr.agent.Operator.ShortcutStep
 import com.example.blurr.agent.Shortcut
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class Persistent {
     fun saveShortcutsToFile(file: File, shortcuts: Map<String, Shortcut>) {
@@ -66,6 +72,20 @@ class Persistent {
         return if (file.exists()) file.readText() else ""
     }
 
+    fun saveBitmapForDebugging(bitmap: Bitmap) {
+        val publicPicturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+        val screenshotDir = File(publicPicturesDir, "ScreenAgent")
+        screenshotDir.mkdirs()
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val file = File(screenshotDir, "SS_$timestamp.png")
+        try {
+            val fos = java.io.FileOutputStream(file)
+            fos.use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            Log.d("MainActivity", "Debug screenshot saved to ${file.absolutePath}")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to save debug screenshot", e)
+        }
+    }
 
 
 }

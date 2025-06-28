@@ -10,13 +10,13 @@
         android:gravity="center"
         android:padding="1dp">
         <!-- Image of Panda in Superman Pose -->
-        <ImageView
-            android:id="@+id/pandaImage"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:adjustViewBounds="true"
-            android:layout_marginBottom="16dp"
-            android:src="@drawable/panda_image2"/>
+<!--        <ImageView-->
+<!--            android:id="@+id/pandaImage"-->
+<!--            android:layout_width="match_parent"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:adjustViewBounds="true"-->
+<!--            android:layout_marginBottom="16dp"-->
+<!--            android:src="@drawable/panda_image2"/>-->
         <EditText
             android:id="@+id/contentMoniterInputField"
             android:layout_width="match_parent"
@@ -65,14 +65,48 @@
             android:focusable="true"/>
 
         <!-- Status Text -->
+<!--        <TextView-->
+<!--            android:id="@+id/statusText"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:text="Status..."-->
+<!--            android:layout_marginTop="16dp"-->
+<!--            android:textSize="16sp"-->
+<!--            android:textColor="@android:color/black"/>-->
+        <Button
+            android:id="@+id/btn_start_service"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Start Agent"
+            android:enabled="false"
+            android:layout_marginBottom="12dp"/>
+
+        <Button
+            android:id="@+id/btn_stop_service"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Stop Agent"
+            android:enabled="false"/>
         <TextView
-            android:id="@+id/statusText"
+            android:id="@+id/tv_service_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Status..."
             android:layout_marginTop="16dp"
-            android:textSize="16sp"
-            android:textColor="@android:color/black"/>
+            android:text="Service Status: Stopped"
+            android:textSize="16sp"/>
+        <TextView
+            android:id="@+id/tv_permission_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Permission: Not Granted"
+            android:textColor="@android:color/holo_red_dark"
+            android:layout_marginBottom="24dp"/>
+        <Button
+            android:id="@+id/btn_request_permission"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Grant Accessibility Permission"
+            android:layout_marginBottom="12dp"/>
 
 
     </LinearLayout>

@@ -15,7 +15,8 @@ data class InfoPool(
     var perceptionInfosPost: MutableList<ClickableInfo> = mutableListOf(),
     var perceptionInfosPreXML: String = "",
     var perceptionInfosPostXML: String = "",
-
+    var screenShotPre: String = "",
+    var screenShotPost: String = "",
 
     var summaryHistory: MutableList<String> = mutableListOf(),
     var actionHistory: MutableList<String> = mutableListOf(),

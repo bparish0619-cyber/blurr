@@ -36,6 +36,8 @@ android {
     }
     buildFeatures {
         compose = true
+        viewBinding = true
+
     }
 }
 val libsuVersion = "6.0.0"
@@ -61,14 +63,15 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation("com.google.android.material:material:1.11.0") // or latest
 
-    // Core shell API
-    implementation("com.github.topjohnwu.libsu:core:$libsuVersion")
-
-    // Optional: Root service support
-    implementation("com.github.topjohnwu.libsu:service:$libsuVersion")
-
-    // Optional: Remote file system support
-    implementation("com.github.topjohnwu.libsu:nio:$libsuVersion")
+//    // Core shell API
+//    implementation("com.github.topjohnwu.libsu:core:$libsuVersion")
+//
+//    // Optional: Root service support
+//    implementation("com.github.topjohnwu.libsu:service:$libsuVersion")
+//
+//    // Optional: Remote file system support
+//    implementation("com.github.topjohnwu.libsu:nio:$libsuVersion")
+//
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("com.squareup.okhttp3:okhttp:5.0.0-alpha.16")
     implementation("com.squareup.moshi:moshi:1.15.0")

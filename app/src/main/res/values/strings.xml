@@ -4,4 +4,6 @@
     <string name="perform_task">Perform Task</string>
     <string name="content_filtering">Content Filtering</string>
     <string name="write_things_you_want_to_avoid">Write Things you want to avoid</string>
+    <string name="accessibility_service_label">Blurr Screen Agent Service</string>
+    <string name="accessibility_service_description">This service allows the app to perform taps and take screenshots for automation.</string>
 </resources>
