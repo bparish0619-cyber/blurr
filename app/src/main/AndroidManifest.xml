@@ -54,9 +54,6 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- The Foreground Service for background tasks -->
-        <service android:name=".AgentService" android:exported="false" android:foregroundServiceType="dataSync"
-            tools:ignore="ForegroundServicePermission" />
 
         <service
             android:name=".ContentModerationService"

@@ -3,17 +3,38 @@ package com.example.blurr
 import android.app.Notification
 import android.app.Service
 import android.content.Intent
+import android.graphics.Bitmap
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
-import com.example.blurr.R
+import com.example.blurr.agent.ActionReflector
+import com.example.blurr.agent.ClickableInfo
+import com.example.blurr.agent.InfoPool
+import com.example.blurr.agent.Manager
+import com.example.blurr.agent.Notetaker
+import com.example.blurr.agent.Operator
+import com.example.blurr.agent.atomicActionSignatures
+import com.example.blurr.agent.shortcut.ReflectorShortCut
+import com.example.blurr.agent.tips.ReflectorTips
+import com.example.blurr.api.Eyes
 import com.example.blurr.api.Finger
+import com.example.blurr.api.Retina
+import com.example.blurr.utilities.Persistent
+import com.example.blurr.utilities.addResponse
+import com.example.blurr.utilities.addResponsePrePost
+import com.example.blurr.utilities.getReasoningModelApiResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 
 class AgentTaskService : Service() {
 
@@ -24,6 +45,7 @@ class AgentTaskService : Service() {
         const val NOTIFICATION_ID = 2 // Use a different ID from your other service
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val inputText = intent?.getStringExtra("USER_INPUT")
         if (inputText == null) {
@@ -51,13 +73,19 @@ class AgentTaskService : Service() {
         return START_NOT_STICKY
     }
 
+    fun appendToFile(file: File, content: String) {
+        file.appendText(content + "\n")
+    }
+
+
+    @RequiresApi(Build.VERSION_CODES.R)
     private suspend fun runAgentLogic(inputText: String) {
-//        CoroutineScope(Dispatchers.IO).launch {
+
             val taskStartTime = System.currentTimeMillis()
             val finger = Finger(this)
             finger.home()
             Thread.sleep((500))
-
+            val context = this
             val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
 
 
@@ -100,8 +128,8 @@ class AgentTaskService : Service() {
 
             appendToFile(taskLog, "{step: 0, operation: init, instruction: $inputText, maxItr: $maxItr }")
 
-            var screenshotFile: File = eyes.getScreenshotFile()
-            var postScreenshotFile: File
+            var screenshotFile: Bitmap? = eyes.openEyes()
+            var postScreenshotFile: Bitmap?
             var xmlMode = false
             while (true) {
                 iteration++
@@ -110,7 +138,7 @@ class AgentTaskService : Service() {
                 if (maxItr < iteration) {
                     Log.e("MainActivity", "Max iteration reached: $maxItr")
                     appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: max_iteration, maxItr: $maxItr, final_info_pool: $infoPool, task_duration: ${(System.currentTimeMillis() - taskStartTime)/1000} seconds}" )
-                    return@launch
+                    return
                 }
 
 //              Consecutive Failure limit
@@ -120,7 +148,7 @@ class AgentTaskService : Service() {
                     if (errFlags.sum() == maxConsecutiveFailure) {
                         Log.e("MainActivity", "Consecutive failures reach the limit. Stopping...")
                         appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: max_consecutive_failures, max_consecutive_failures: $maxConsecutiveFailure, final_info_pool: $infoPool, task_duration: ${(System.currentTimeMillis() - taskStartTime)/1000} seconds}")
-                        return@launch
+                        return
                     }
                 }
 
@@ -154,7 +182,7 @@ class AgentTaskService : Service() {
                         if (!repeatedActionKey.contains("Swipe") && !repeatedActionKey.contains("Back")) {
                             Log.e("MainActivity", "Repetitive actions reaches the limit. Stopping...")
                             appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: max_repetitive_actions, max_repetitive_actions: $maxRepetitiveActions, final_info_pool: $infoPool, task_duration: ${(System.currentTimeMillis() - taskStartTime)/1000} seconds}")
-                            return@launch
+                            return
                         }
                     }
                 }
@@ -164,8 +192,8 @@ class AgentTaskService : Service() {
                 if (iteration == 1){
                     val perceptionTimeStart = System.currentTimeMillis()
                     val screenshotPath = File(screenshotsDir, "screenshot.jpg")
-                    screenshotFile.copyTo(screenshotPath, overwrite = true)
-                    val lastScreenshotFile = screenshotPath // Store for potential removal
+//                    screenshotFile.copyTo(screenshotPath, overwrite = true)
+//                    val lastScreenshotFile = screenshotPath // Store for potential removal
                     val (perceptionInfos, width, height, keyboardOn) = retina.getPerceptionInfos(
                         context
                     )
@@ -181,9 +209,8 @@ class AgentTaskService : Service() {
                     )
                     infoPool.keyboardPre = keyboardOn
                     if (xmlMode){
-                        eyes.openXMLEyes()
-                        val xml = eyes.getWindowDumpFile()
-                        infoPool.perceptionInfosPreXML = xml.readText()
+                        val xml = eyes.openXMLEyes()
+                        infoPool.perceptionInfosPreXML = xml
                     }
                     infoPool.perceptionInfosPre = perceptionInfos as MutableList<ClickableInfo>
 
@@ -280,8 +307,7 @@ class AgentTaskService : Service() {
                     val taskEndTime = System.currentTimeMillis()
                     appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: success, final_info_pool: $infoPool, task_duration: ${(taskEndTime - taskStartTime)/1000} seconds}")
                     Log.i("MainActivity", "Task finished successfully by planner.")
-                    statusText.text = infoPool.importantNotes
-                    return@launch
+                    return
                 }
 
                 var actionThinkingTimeStart = System.currentTimeMillis()
@@ -322,7 +348,7 @@ class AgentTaskService : Service() {
                         """.trimIndent()
                     )
                     Log.w("MainActivity", "WARNING!!: Abnormal finishing: $actionObjStr")
-                    return@launch
+                    return
                 }
 
 
@@ -348,12 +374,10 @@ class AgentTaskService : Service() {
 
 //               Step 4 : Take the Perception after the action by operator has been performed
                 val perceptionPostStartTime = System.currentTimeMillis()
-                postScreenshotFile = eyes.getScreenshotFile()
-                val postScreenshotPath = File(screenshotsDir, "screenshot_post_${iteration}.jpg")
-                postScreenshotFile.copyTo(postScreenshotPath, overwrite = true)
+                postScreenshotFile = eyes.openEyes()
                 val (postPerceptionInfos, _, _, keyBoardOnPost) = retina.getPerceptionInfos(context)
                 val perceptionPostEndTime = System.currentTimeMillis()
-                appendToFile(taskLog, "{step: $iteration, operation: perception_post, screenshot: $postScreenshotPath, perception_infos: ${postPerceptionInfos.forEach { (text, coordinates) -> println("Text: $text, Coordinates: $coordinates \n") }}, duration: ${(perceptionPostEndTime - perceptionPostStartTime)/1000} seconds}")
+                appendToFile(taskLog, "{step: $iteration, operation: perception_post, screenshot: NUll, perception_infos: ${postPerceptionInfos.forEach { (text, coordinates) -> println("Text: $text, Coordinates: $coordinates \n") }}, duration: ${(perceptionPostEndTime - perceptionPostStartTime)/1000} seconds}")
                 infoPool.perceptionInfosPost = postPerceptionInfos as MutableList<ClickableInfo>
                 eyes.openXMLEyes()
                 val xmlPost = eyes.getWindowDumpFile()
@@ -371,7 +395,7 @@ class AgentTaskService : Service() {
                 val reflectionCombinedChat  = addResponsePrePost("user",reflectionPrompt, reflectionChat, screenshotFile, postScreenshotFile )
 
                 // Sending to the GEMINI
-                val reflectionLLMOutput = getReasoningModelApiResponse(reflectionCombinedChat, apiKey = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
+                val reflectionLLMOutput = getReasoningModelApiResponse(reflectionCombinedChat, apiKey = API_KEY)
                 val parsedReflection = actionReflector.parseResponse(reflectionLLMOutput)
 
                 val outcome = parsedReflection["outcome"].toString()
@@ -465,7 +489,6 @@ class AgentTaskService : Service() {
                 infoPool.keyboardPre = infoPool.keyboardPost
                 infoPool.perceptionInfosPre = infoPool.perceptionInfosPost
                 infoPool.perceptionInfosPreXML = infoPool.perceptionInfosPostXML
-//            }
         }
     }
 
