@@ -122,6 +122,7 @@ class AgentTaskService : Service() {
             appendToFile(taskLog, "{step: 0, operation: init, instruction: $inputText, maxItr: $maxItr }")
 
         var screenshotFile = eyes.openEyes()
+
         var postScreenshotFile: Bitmap?
             var xmlMode = true
             while (true) {
@@ -182,7 +183,7 @@ class AgentTaskService : Service() {
 
 
                 // Step 1: Take Perception
-                if (iteration == 1){
+                if (iteration == 1 && screenshotFile != null){
                     val perceptionTimeStart = System.currentTimeMillis()
                     val screenshotPath = File(screenshotsDir, "screenshot.jpg")
 //                    screenshotFile.copyTo(screenshotPath, overwrite = true)
@@ -239,7 +240,7 @@ class AgentTaskService : Service() {
                 val combinedChatPlan  = addResponse("user",promptPlan, chatPlan, screenshotFile )
                 // Request to Gemini
                 val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = API_KEY)
-                val parsedManagerPlan = manager.parseResponse(outputPlan)
+                val parsedManagerPlan = manager.parseResponse(outputPlan.toString())
 
                 // Updating the InfoPool
                 infoPool.plan = parsedManagerPlan["plan"].toString()
@@ -273,7 +274,9 @@ class AgentTaskService : Service() {
                         var combined =
                             addResponse("user", promptKnowledgeShortcuts, chatKnowledgeShortcuts)
                         val outputKnowledgeShortcuts = getReasoningModelApiResponse(combined, apiKey = API_KEY) // Assuming KNOWLEDGE_REFLECTION_MODEL is similar to other models
-                        val parsedResultKnowledgeShortcuts = reflectorShortCut.parseResponse(outputKnowledgeShortcuts)
+                        val parsedResultKnowledgeShortcuts = reflectorShortCut.parseResponse(
+                            outputKnowledgeShortcuts.toString()
+                        )
                         val newShortcutStr = parsedResultKnowledgeShortcuts["new_shortcut"].toString()
                         if (newShortcutStr != "None" && newShortcutStr.isNotEmpty()) {
                             reflectorShortCut.addNewShortcut(newShortcutStr, infoPool)
@@ -285,7 +288,9 @@ class AgentTaskService : Service() {
                         var chatKnowledgeTips = reflectorTips.initChat()
                         var combinedTips = addResponse("user", promptKnowledgeTips, chatKnowledgeTips)
                         val outputKnowledgeTips = getReasoningModelApiResponse(combinedTips, apiKey = API_KEY) // Assuming KNOWLEDGE_REFLECTION_MODEL
-                        val parsedResultKnowledgeTips = reflectorTips.parseResponse(outputKnowledgeTips)
+                        val parsedResultKnowledgeTips = reflectorTips.parseResponse(
+                            outputKnowledgeTips.toString()
+                        )
                         val updatedTips = parsedResultKnowledgeTips["updated_tips"].toString()
                         infoPool.tips = updatedTips
                         Log.d("MainActivity", "Updated Tips: $updatedTips")
@@ -314,7 +319,7 @@ class AgentTaskService : Service() {
                 val actionChat = operator.initChat()
                 val actionCombinedChat  = addResponse("user",actionPrompt, actionChat, screenshotFile )
                 var actionOutput = getReasoningModelApiResponse(actionCombinedChat, apiKey = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
-                var parsedAction = operator.parseResponse(actionOutput)
+                var parsedAction = operator.parseResponse(actionOutput.toString())
                 var actionThought = parsedAction["thought"]
                 var actionObjStr = parsedAction["action"]
                 var actionDesc = parsedAction["description"]
@@ -369,20 +374,30 @@ class AgentTaskService : Service() {
                 Log.d("MainActivity","Action Description: ${actionDesc.toString()}")
                 Log.d("MainActivity","Action: ${actionObjStr.toString()}")
 
-
-//               Step 4 : Take the Perception after the action by operator has been performed
                 val perceptionPostStartTime = System.currentTimeMillis()
                 postScreenshotFile = eyes.openEyes()
-                val (postPerceptionInfos, _, _, keyBoardOnPost) = retina.getPerceptionInfos(context, screenshotFile)
-                val perceptionPostEndTime = System.currentTimeMillis()
-                appendToFile(taskLog, "{step: $iteration, operation: perception_post, screenshot: NUll, perception_infos: ${postPerceptionInfos.forEach { (text, coordinates) -> println("Text: $text, Coordinates: $coordinates \n") }}, duration: ${(perceptionPostEndTime - perceptionPostStartTime)/1000} seconds}")
-                infoPool.perceptionInfosPost = postPerceptionInfos as MutableList<ClickableInfo>
-                eyes.openXMLEyes()
-                val xmlPost = eyes.getWindowDumpFile()
-                infoPool.perceptionInfosPostXML = xmlPost.readText()
-                infoPool.keyboardPost = keyBoardOnPost
-
-
+//               Step 4 : Take the Perception after the action by operator has been performed
+                if (postScreenshotFile!= null && screenshotFile != null)
+                {
+                    val (postPerceptionInfos, _, _, keyBoardOnPost) = retina.getPerceptionInfos(
+                        context,
+                        screenshotFile
+                    )
+                    val perceptionPostEndTime = System.currentTimeMillis()
+                    appendToFile(
+                        taskLog,
+                        "{step: $iteration, operation: perception_post, screenshot: NUll, perception_infos: ${
+                            postPerceptionInfos.forEach { (text, coordinates) ->
+                                println("Text: $text, Coordinates: $coordinates \n")
+                            }
+                        }, duration: ${(perceptionPostEndTime - perceptionPostStartTime) / 1000} seconds}"
+                    )
+                    infoPool.perceptionInfosPost = postPerceptionInfos as MutableList<ClickableInfo>
+                    eyes.openXMLEyes()
+                    val xmlPost = eyes.openXMLEyes()
+                    infoPool.perceptionInfosPostXML = xmlPost
+                    infoPool.keyboardPost = keyBoardOnPost
+                }
 
 
 
@@ -394,7 +409,7 @@ class AgentTaskService : Service() {
 
                 // Sending to the GEMINI
                 val reflectionLLMOutput = getReasoningModelApiResponse(reflectionCombinedChat, apiKey = API_KEY)
-                val parsedReflection = actionReflector.parseResponse(reflectionLLMOutput)
+                val parsedReflection = actionReflector.parseResponse(reflectionLLMOutput.toString())
 
                 val outcome = parsedReflection["outcome"].toString()
                 val errorDescription = parsedReflection["error_description"].toString()
@@ -466,7 +481,7 @@ class AgentTaskService : Service() {
                     var chatNote = noteTaker.initChat()
                     var combined = addResponse("user", promptNote, chatNote, postScreenshotFile) // Use the post-action screenshot
                     val outputNote = getReasoningModelApiResponse(combined, apiKey = API_KEY)
-                    val parsedResultNote = noteTaker.parseResponse(outputNote)
+                    val parsedResultNote = noteTaker.parseResponse(outputNote.toString())
                     val importantNotes = parsedResultNote["important_notes"].toString()
                     infoPool.importantNotes = importantNotes
 

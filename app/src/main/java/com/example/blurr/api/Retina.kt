@@ -163,58 +163,176 @@ class Retina(
         """.trimIndent()
 
     @RequiresApi(Build.VERSION_CODES.R)
-    suspend fun getPerceptionInfos(context: Context?, bitmap: Bitmap?): Quadruple<List<ClickableInfo>, Int, Int, Boolean> {
-        if (bitmap == null ){
-            return Quadruple(emptyList(), 0, 0, true)
-        }
+    suspend fun getPerceptionInfos(context: Context?, bitmap: Bitmap): Quadruple<List<ClickableInfo>, Int, Int, Boolean> {
+
         val width = bitmap.width
         val height = bitmap.height
+        val imgHelp = ImageHelper()
+        val base64Image = imgHelp.bitmapToBase64(bitmap)
+
+// Step 3: Prepare JSON request body with schema
+        val payload = JSONObject().apply {
+            put("model", "gemini-2.0-flash")
+
+            // Contents array
+            val content = JSONObject().apply {
+                put("parts", JSONArray().apply {
+                    put(JSONObject().put("inline_data", JSONObject()
+                        .put("mime_type", "image/png")
+                        .put("data", base64Image)
+                    ))
+                    put(JSONObject().put("text", boundingBoxSystemInstructionsv3))
+                })
+            }
+            put("contents", JSONArray().put(content))
+
+            // Generation config with response schema
+            put("generationConfig", JSONObject().apply {
+                put("responseMimeType", "application/json")
+                put("responseSchema", JSONObject().apply {
+                    put("type", "ARRAY")
+                    put("items", JSONObject().apply {
+                        put("type", "OBJECT")
+                        put("properties", JSONObject().apply {
+                            put("label", JSONObject().put("type", "STRING"))
+                            put("box_2d", JSONObject().apply {
+                                put("type", "ARRAY")
+                                put("items", JSONObject().put("type", "NUMBER"))
+                            })
+                        })
+                        put("propertyOrdering", JSONArray().apply {
+                            put("label")
+                            put("box_2d")
+                        })
+                    })
+                })
+            })
+        }
+
+        // Step 4: Send request to Gemini
+        val responseText = GeminiApi.generateContent(boundingBoxSystemInstructionsv3, listOf(bitmap))
+
+//        val clientWithTimeouts = client.newBuilder()
+//            .connectTimeout(30, TimeUnit.SECONDS)
+//            .readTimeout(60, TimeUnit.SECONDS)
+//            .writeTimeout(60, TimeUnit.SECONDS)
+//            .build()
+//        val maxRetries = 3
+//        var attempt = 0
+//        var lastException: Exception? = null
+//        var responseText: String? = null
+//
+//        while (attempt < maxRetries && responseText == null) {
+//            try {
+//                val request = Request.Builder()
+//                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
+//                    .post(payload.toString().toRequestBody("application/json".toMediaType()))
+//                    .build()
+//
+//                val response = clientWithTimeouts.newCall(request).execute()
+//                response.use {
+//                    if (!response.isSuccessful) {
+//                        throw IOException("Gemini API failed: ${response.code} ${response.message}")
+//                    }
+//
+//                    val resultJson = JSONObject(response.body?.string() ?: "")
+//                    responseText = resultJson
+//                        .getJSONArray("candidates")
+//                        .getJSONObject(0)
+//                        .getJSONObject("content")
+//                        .getJSONArray("parts")
+//                        .getJSONObject(0)
+//                        .getString("text")
+//                }
+//            } catch (e: Exception) {
+//                lastException = e
+//                attempt++
+//                if (attempt < maxRetries) {
+//                    val delay = 1000L * attempt
+//                    println("Gemini request failed (attempt $attempt), retrying in ${delay}ms: ${e.message}")
+//                    Thread.sleep(delay)
+//                }
+//            }
+//        }
+//
+//        if (responseText == null) {
+//            throw lastException ?: Exception("Unknown error in Gemini API call")
+//        }
+
         val clickableInfos = mutableListOf<ClickableInfo>()
-        val keyBoardMap = mutableMapOf<String, Int>()
+        val sanitizedJson = sanitizeJson(responseText.toString())
+//        println(sanitizedJson)
 
-        val geminiResponseText = callGeminiApi(bitmap)
-        if (geminiResponseText != null) {
-            val sanitizedJson = sanitizeJson(geminiResponseText)
-            val boxes = extractJsonArray(sanitizedJson)
-            boxes.mapNotNull { obj ->
-                try {
-                    // ... (your existing logic to parse boxes and add to clickableInfos)
-                    val box = obj.getJSONArray("box_2d")
-                    val label = obj.getString("label")
-                    val ymin = box.getDouble(0) / 1000 * height
-                    val xmin = box.getDouble(1) / 1000 * width
-                    val ymax = box.getDouble(2) / 1000 * height
-                    val xmax = box.getDouble(3) / 1000 * width
-                    val centerX = ((xmin + xmax) / 2).toInt()
-                    val centerY = ((ymin + ymax) / 2).toInt()
-                    keyBoardMap[label] = 10
-                    clickableInfos.add(ClickableInfo("icon: $label", centerX to centerY))
-                } catch (e: Exception) { null }
+        var keyBoardMap = mutableMapOf<String, Int>()
+
+        val boxes = extractJsonArray(sanitizedJson)
+        boxes.mapNotNull { obj ->
+            try {
+                val box = obj.getJSONArray("box_2d")
+                val label = obj.getString("label")
+                val ymin = box.getDouble(0) / 1000 * height
+                val xmin = box.getDouble(1) / 1000 * width
+                val ymax = box.getDouble(2) / 1000 * height
+                val xmax = box.getDouble(3) / 1000 * width
+                val centerX = ((xmin + xmax) / 2).toInt()
+                val centerY = ((ymin + ymax) / 2).toInt()
+                keyBoardMap[label] = 10
+                clickableInfos.add(ClickableInfo("icon: $label", centerX to centerY))
+            } catch (e: Exception) {
+                null
             }
         }
+//        :race-horse: Completed the integration of the Task Performer
+//
+//        Additional
 
-        // Call the OCR API to get text elements
-        val ocrResponseText = callOcrApi(bitmap)
-        if (ocrResponseText != null) {
-            val json = JSONObject(ocrResponseText)
-            val results = json.getJSONArray("results")
-            for (i in 0 until results.length()) {
-                // ... (your existing logic to parse OCR results and add to clickableInfos)
-                val obj = results.getJSONObject(i)
-                val text = obj.getString("text")
-                val center = obj.getJSONArray("center")
-                val cx = center.getDouble(0).toInt()
-                val cy = center.getDouble(1).toInt()
-                keyBoardMap[text] = 10
-                clickableInfos.add(ClickableInfo("text: $text", cx to cy))
-            }
-        }
+        // Step 6 Send to FastAPI OCR
+//        val outputStream = ByteArrayOutputStream()
+//        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+//        val imageBytes = outputStream.toByteArray()
+//        val requestBodyOCR = MultipartBody.Builder()
+//            .setType(MultipartBody.FORM)
+//            .addFormDataPart(
+//                "image",
+//                System.currentTimeMillis().toString(),
+//                imageBytes.toRequestBody("image/png".toMediaType())
+//            )
+//            .build()
+//
+//        val requestOCR = Request.Builder()
+//            .url("http://10.0.2.2:8000/ocr")
+//            .post(requestBodyOCR)
+//            .build()
+//
+//        val responseOCR = client.newCall(requestOCR).execute()
+//        if (!responseOCR.isSuccessful) {
+//            throw Exception("OCR API failed: ${responseOCR.code} ${responseOCR.message}")
+//        }
 
+//        val json = JSONObject(responseOCR.body.string())
+//        val results = json.getJSONArray("results")
+
+        // step 7, add parsed stuff too to the info
+//        for (i in 0 until results.length()) {
+//            val obj = results.getJSONObject(i)
+//            val text = obj.getString("text")
+//            val center = obj.getJSONArray("center")
+//            val cx = center.getDouble(0).toInt()
+//            val cy = center.getDouble(1).toInt()
+//            keyBoardMap[text] = 10
+//            clickableInfos.add(ClickableInfo("text: $text", cx to cy))
+//        }
+
+        // if in debug or testing, save the perception and coord in the logs
         if (context != null) {
 //            logPerceptionInfo(context, clickableInfos)
         }
 
-        val keyboardOpen = ('a'..'z').all { char -> keyBoardMap.containsKey(char.toString()) }
+        // Check if keyboardMap contains all characters from 'a' to 'z'
+        val keyboardOpen = ('a'..'z').all { char ->
+            keyBoardMap.containsKey(char.toString())
+        }
+
 
         return Quadruple(clickableInfos, width, height, keyboardOpen)
     }

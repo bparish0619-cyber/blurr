@@ -162,12 +162,12 @@ class MainActivity : AppCompatActivity() {
                 }
                 startService(serviceIntent)
 //
-//                // 1. Go to the home screen
-//                val fin = Finger(this@MainActivity)
-//                fin.home()
-//
+                // 1. Go to the home screen
+                val fin = Finger(this@MainActivity)
+                fin.home()
+
 //                // 2. Wait for 1.5 seconds (non-blocking) for the UI to settle
-//                delay(1500)
+                delay(500)
 //
 //                // 3. Now, start the service when the UI is stable
 //

@@ -155,7 +155,7 @@ class ContentModerationService : Service() {
                 // 4. Call the AI with the in-memory bitmap
                 val combined = addResponse("user", pro, init,screenshotBitmap)
                 val output = getReasoningModelApiResponse(combined, apiKey = API_KEY)
-                val parsed = judge.parseResponse(output)
+                val parsed = judge.parseResponse(output.toString())
 
                 println("JUDGEMENT: ${parsed["judgement"]}")
                 println("REASON: ${parsed["reason"]}")
