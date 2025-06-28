@@ -237,50 +237,50 @@ class Operator(private val finger: Finger) : BaseAgent() {
 
         if (name.lowercase() != "wait") Thread.sleep(3000)
     }
-
-    fun logActionOnScreenshot(action: String, args: Map<*, *>, context: Context) {
-
-        val eyes = Eyes(context)
-        val screenshotFile = eyes.getScreenshotFile()
-
-        val bitmap = BitmapFactory.decodeFile(screenshotFile?.absolutePath)
-            .copy(Bitmap.Config.ARGB_8888, true)
-
-        val canvas = Canvas(bitmap)
-        val paint = Paint().apply {
-            color = Color.RED
-            style = Paint.Style.FILL
-            textSize = 40f
-        }
-
-        when (action.lowercase()) {
-            "tap" -> {
-                val x = (args["x"] as? Number)?.toInt() ?: return
-                val y = (args["y"] as? Number)?.toInt() ?: return
-                canvas.drawCircle(x.toFloat(), y.toFloat(), 30f, paint)
-                canvas.drawText("TAP", x + 35f, y.toFloat(), paint)
-            }
-            "swipe" -> {
-                val x1 = (args["x1"] as? Number)?.toFloat() ?: return
-                val y1 = (args["y1"] as? Number)?.toFloat() ?: return
-                val x2 = (args["x2"] as? Number)?.toFloat() ?: return
-                val y2 = (args["y2"] as? Number)?.toFloat() ?: return
-                paint.strokeWidth = 8f
-                canvas.drawLine(x1, y1, x2, y2, paint)
-                canvas.drawText("SWIPE", x1 + 10f, y1 - 10f, paint)
-            }
-            else -> return
-        }
-        val logDir = File(context.filesDir, "actionLogs")
-        logDir.mkdirs()
-        val timestamp = System.currentTimeMillis()
-        val logFile = File(logDir, "action_$timestamp.jpg")
-        FileOutputStream(logFile).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
-        }
-        println("Logging of actionInfo saved in data/data/com.example.blurr/files/actionLogs/action_$timestamp.jpg")
-
-    }
+//
+//    fun logActionOnScreenshot(action: String, args: Map<*, *>, context: Context) {
+//
+//        val eyes = Eyes(context)
+//        val screenshotFile = eyes.getScreenshotFile()
+//
+//        val bitmap = BitmapFactory.decodeFile(screenshotFile?.absolutePath)
+//            .copy(Bitmap.Config.ARGB_8888, true)
+//
+//        val canvas = Canvas(bitmap)
+//        val paint = Paint().apply {
+//            color = Color.RED
+//            style = Paint.Style.FILL
+//            textSize = 40f
+//        }
+//
+//        when (action.lowercase()) {
+//            "tap" -> {
+//                val x = (args["x"] as? Number)?.toInt() ?: return
+//                val y = (args["y"] as? Number)?.toInt() ?: return
+//                canvas.drawCircle(x.toFloat(), y.toFloat(), 30f, paint)
+//                canvas.drawText("TAP", x + 35f, y.toFloat(), paint)
+//            }
+//            "swipe" -> {
+//                val x1 = (args["x1"] as? Number)?.toFloat() ?: return
+//                val y1 = (args["y1"] as? Number)?.toFloat() ?: return
+//                val x2 = (args["x2"] as? Number)?.toFloat() ?: return
+//                val y2 = (args["y2"] as? Number)?.toFloat() ?: return
+//                paint.strokeWidth = 8f
+//                canvas.drawLine(x1, y1, x2, y2, paint)
+//                canvas.drawText("SWIPE", x1 + 10f, y1 - 10f, paint)
+//            }
+//            else -> return
+//        }
+//        val logDir = File(context.filesDir, "actionLogs")
+//        logDir.mkdirs()
+//        val timestamp = System.currentTimeMillis()
+//        val logFile = File(logDir, "action_$timestamp.jpg")
+//        FileOutputStream(logFile).use { out ->
+//            bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+//        }
+//        println("Logging of actionInfo saved in data/data/com.example.blurr/files/actionLogs/action_$timestamp.jpg")
+//
+//    }
 
     private fun extractSection(text: String, start: String, end: String?): String {
         val startIndex = text.indexOf(start)
@@ -356,7 +356,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
                             "y" to clickableInfo.coordinates.second
                         )
                         executeAtomicAction("Tap", tapArgs, context)
-                        logActionOnScreenshot("Tap", tapArgs, context)
+//                        logActionOnScreenshot("Tap", tapArgs, context)
                         return Triple(actionObj, 1, null)
                 }
                     if (appName in listOf("Fandango", "Walmart", "Best Buy")) {
@@ -366,7 +366,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
                 Thread.sleep(10000)
             } else {
                 executeAtomicAction(name, arguments, context)
-                logActionOnScreenshot(name, arguments, context)
+//                logActionOnScreenshot(name, arguments, context)
             }
             return Triple(actionObj, 1, null)
         }
@@ -391,9 +391,9 @@ class Operator(private val finger: Finger) : BaseAgent() {
                     println("\t Executing sub-step $i: $atomicActionName $atomicActionArgs ...")
                     executeAtomicAction(atomicActionName, atomicActionArgs, context)
 
-                    logActionOnScreenshot(atomicActionName, atomicActionArgs, context)
-                    val eyes = Eyes(context)
-                    eyes.openEyes()
+//                    logActionOnScreenshot(atomicActionName, atomicActionArgs, context)
+//                    val eyes = Eyes(context)
+//                    eyes.openEyes()
                     Thread.sleep(800)
                 }
                 return Triple(actionObj, shortcut.atomicActionSequence.size, null)
