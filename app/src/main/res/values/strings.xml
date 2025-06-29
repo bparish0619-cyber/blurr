@@ -6,4 +6,10 @@
     <string name="write_things_you_want_to_avoid">Write Things you want to avoid</string>
     <string name="accessibility_service_label">Blurr Screen Agent Service</string>
     <string name="accessibility_service_description">This service allows the app to perform taps and take screenshots for automation.</string>
+    <string name="view_source_code_on_github">⭐ Star us on Github</string>
+    <string name="hello_sir">Hey, Panda Here</string>
+    <string name="assistant_at_nyour_command">Assistant at\nYour Command</string>
+    <string name="grant_accessibility_permission">Grant Accessibility Permission</string>
+    <string name="permission_not_granted">Permission: Not Granted</string>
+    <string name="service_status_stopped">Service Status: Stopped</string>
 </resources>

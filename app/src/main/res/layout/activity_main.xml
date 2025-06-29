@@ -1,113 +1,177 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_color">
+    android:background="@drawable/bg"
+    android:fitsSystemWindows="true">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_above="@+id/permission_section"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="left"
+            android:orientation="vertical"
+            android:padding="16dp"
+            tools:ignore="RtlHardcoded">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:gravity="left"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/karan_textview_gradient"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hello_sir"
+                    android:textColor="#CECECE"
+                    android:textSize="40sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/subtitle_textview"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:gravity="center_horizontal"
+                android:text="@string/assistant_at_nyour_command"
+                android:textAlignment="viewStart"
+                android:textColor="#FFFFFF"
+                android:textSize="40sp"
+                tools:ignore="RtlCompat" />
+
+
+            <EditText
+                android:id="@+id/contentMoniterInputField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:autofillHints="Shopping Apps"
+                android:background="@drawable/rounded_background"
+                android:hint="@string/write_things_you_want_to_avoid"
+                android:inputType="text"
+                android:padding="12dp"
+                android:textColor="#CECECE"
+                android:textColorHint="#888888" />
+
+            <!-- Perform Task Button -->
+            <TextView
+                android:id="@+id/contentMoniterButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/rounded_button"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:padding="12dp"
+                android:text="@string/content_filtering"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <!-- Input Field -->
+            <EditText
+                android:id="@+id/inputField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:autofillHints="Play song on youtube"
+                android:background="@drawable/rounded_background"
+                android:hint="@string/input_the_task"
+                android:inputType="text"
+                android:padding="12dp"
+                android:textColor="#CECECE"
+                android:textColorHint="#888888" />
+
+            <!-- Perform Task Button -->
+            <TextView
+                android:id="@+id/performTaskButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/rounded_button"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:padding="12dp"
+                android:text="@string/perform_task"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+
+            <TextView
+                android:id="@+id/tv_service_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center_horizontal"
+                android:text="@string/service_status_stopped"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
+            <!-- The permission views have been moved out of this ScrollView -->
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- START: NEW BOTTOM SECTION -->
     <LinearLayout
+        android:id="@+id/permission_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:gravity="center"
-        android:padding="1dp">
-        <!-- Image of Panda in Superman Pose -->
-<!--        <ImageView-->
-<!--            android:id="@+id/pandaImage"-->
-<!--            android:layout_width="match_parent"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            android:adjustViewBounds="true"-->
-<!--            android:layout_marginBottom="16dp"-->
-<!--            android:src="@drawable/panda_image2"/>-->
-        <EditText
-            android:id="@+id/contentMoniterInputField"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/write_things_you_want_to_avoid"
-            android:layout_marginTop="16dp"
-            android:padding="12dp"
-            android:background="@drawable/rounded_background"/>
+        android:layout_above="@id/divider"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="16dp">
 
-        <!-- Perform Task Button -->
-        <TextView
-            android:id="@+id/contentMoniterButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/content_filtering"
-            android:textColor="@android:color/white"
-            android:textSize="16sp"
-            android:layout_marginTop="12dp"
-            android:padding="12dp"
-            android:background="@drawable/rounded_button"
-            android:clickable="true"
-            android:focusable="true"/>
-
-        <!-- Input Field -->
-        <EditText
-            android:id="@+id/inputField"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/input_the_task"
-            android:layout_marginTop="16dp"
-            android:padding="12dp"
-            android:background="@drawable/rounded_background"/>
-
-        <!-- Perform Task Button -->
-        <TextView
-            android:id="@+id/performTaskButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/perform_task"
-            android:textColor="@android:color/white"
-            android:textSize="16sp"
-            android:layout_marginTop="12dp"
-            android:padding="12dp"
-            android:background="@drawable/rounded_button"
-            android:clickable="true"
-            android:focusable="true"/>
-
-        <!-- Status Text -->
-<!--        <TextView-->
-<!--            android:id="@+id/statusText"-->
-<!--            android:layout_width="wrap_content"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            android:text="Status..."-->
-<!--            android:layout_marginTop="16dp"-->
-<!--            android:textSize="16sp"-->
-<!--            android:textColor="@android:color/black"/>-->
-        <Button
-            android:id="@+id/btn_start_service"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Start Agent"
-            android:enabled="false"
-            android:layout_marginBottom="12dp"/>
-
-        <Button
-            android:id="@+id/btn_stop_service"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Stop Agent"
-            android:enabled="false"/>
-        <TextView
-            android:id="@+id/tv_service_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Service Status: Stopped"
-            android:textSize="16sp"/>
         <TextView
             android:id="@+id/tv_permission_status"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Permission: Not Granted"
-            android:textColor="@android:color/holo_red_dark"
-            android:layout_marginBottom="24dp"/>
-        <Button
+            android:gravity="center_horizontal"
+            android:text="@string/permission_not_granted"
+            android:textColor="@android:color/holo_red_dark" />
+
+
+        <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btn_request_permission"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Grant Accessibility Permission"
-            android:layout_marginBottom="12dp"/>
-
-
+            android:layout_marginTop="8dp"
+            android:background="@drawable/btn_with_border"
+            android:text="@string/grant_accessibility_permission"
+            android:textColor="@android:color/white" />
     </LinearLayout>
-</ScrollView>
+    <!-- END: NEW BOTTOM SECTION -->
+
+    <View
+        android:id="@+id/divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_above="@+id/github_link_textview"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="#3B3B3B" />
+
+    <TextView
+        android:id="@+id/github_link_textview"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:clickable="true"
+        android:focusable="true"
+        android:padding="16dp"
+        android:text="@string/view_source_code_on_github"
+        android:textColor="#5880F7"
+        android:textSize="14sp" />
+</RelativeLayout>

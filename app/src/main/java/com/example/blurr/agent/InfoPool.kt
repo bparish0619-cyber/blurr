@@ -41,7 +41,9 @@ data class InfoPool(
     var keyboardPre: Boolean = false,
     var keyboardPost: Boolean = false,
 
-    var futureTasks: MutableList<String> = mutableListOf()
+    var futureTasks: MutableList<String> = mutableListOf(),
+
+    var recalledMemories: String = ""
 )
 
 

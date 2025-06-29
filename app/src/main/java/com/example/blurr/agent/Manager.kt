@@ -17,6 +17,13 @@ class Manager : BaseAgent() {
         sb.appendLine("### User Instruction ###")
         sb.appendLine(infoPool.instruction)
         sb.appendLine()
+
+        if (infoPool.recalledMemories.isNotEmpty()) {
+            sb.appendLine(" ### Memories about User relevant to this Instruction ###")
+            sb.appendLine(infoPool.recalledMemories)
+            sb.appendLine()
+        }
+
         if (infoPool.perceptionInfosPre.isNotEmpty() && !xmlMode ) {
             sb.appendLine("### Visible Screen Elements ###")
             sb.appendLine("The following UI elements are currently visible on the screen:")
