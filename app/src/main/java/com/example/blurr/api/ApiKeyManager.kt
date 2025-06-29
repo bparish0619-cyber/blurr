@@ -15,9 +15,6 @@ object ApiKeyManager {
         emptyList()
     }
 
-
-    // Using AtomicInteger makes sure the index is incremented safely even if
-    // multiple threads make requests at the exact same time.
     private val currentIndex = AtomicInteger(0)
 
     /**

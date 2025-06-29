@@ -1,7 +1,16 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+}
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
 }
 
 android {
@@ -25,6 +34,23 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Get the API keys string from the properties
+// Get the API keys string from the properties
+            val apiKeys = localProperties.getProperty("GEMINI_API_KEYS") ?: ""
+            val tavilyApiKeys = localProperties.getProperty("TAVILY_API") ?: ""
+
+            // This line CREATES the variable. Make sure it's here and not commented out.
+            buildConfigField("String", "GEMINI_API_KEYS", "\"$apiKeys\"")
+            buildConfigField("String", "TAVILY_API", "\"$tavilyApiKeys\"")
+
+        }
+        debug {
+            // Also add it to the 'debug' block so it works when you run from Android Studio
+            val apiKeys = localProperties.getProperty("GEMINI_API_KEYS") ?: ""
+            val tavilyApiKeys = localProperties.getProperty("TAVILY_API") ?: ""
+            // This line must ALSO be here.
+            buildConfigField("String", "TAVILY_API", "\"$tavilyApiKeys\"")
+            buildConfigField("String", "GEMINI_API_KEYS", "\"$apiKeys\"")
         }
     }
     compileOptions {
@@ -37,7 +63,7 @@ android {
     buildFeatures {
         compose = true
         viewBinding = true
-
+        buildConfig = true
     }
 }
 val libsuVersion = "6.0.0"

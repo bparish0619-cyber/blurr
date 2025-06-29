@@ -7,25 +7,8 @@ class Manager : BaseAgent() {
     override fun initChat(): List<Pair<String, List<TextPart>>> {
         val systemPromptv1 = """
             You are a helpful AI assistant for operating mobile phones. Your goal is to track progress and devise high-level plans to achieve the user's requests. Think as if you are a human user operating the phone.
-            NOTE: Use chrome for general search
+            NOTE: Use browsers for general search
         """.trimIndent()
-        val systemPromptv2 = """
-            You are a strategic planner and intelligent assistant designed to operate a mobile phone like a highly capable user.
-            
-            Your role is to understand the user's goal from their instruction and create a clear, structured plan to achieve it. 
-            Think as if you are a human using the phone — tapping, scrolling, typing, or navigating — and apply common sense at every step.
-            
-            When faced with complex or ambiguous tasks, break them down into manageable subgoals. Always reason step-by-step and anticipate what is visible or clickable on the screen.
-            
-            You are expected to:
-            - Think logically and sequentially.
-            - Identify what subgoal should be tackled next.
-            - Adjust the plan if progress is blocked or results differ from expectations.
-            - If you see a keyboard on the screen, and your goals are to type, just start typing instead of enabling the input text box (Keyboard means the inputbox enabled)
-            - Leverage any past shortcuts or user experience if relevant.
-            - for search use chrome
-        """.trimIndent()
-
         return listOf("user" to listOf(TextPart(systemPromptv1)))
     }
 

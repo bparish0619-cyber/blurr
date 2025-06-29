@@ -71,6 +71,7 @@ class ScreenInteractionService : AccessibilityService() {
                 Log.e("InteractionService", "Error dumping UI hierarchy to string", e)
                 return@withContext "<hierarchy error=\"${e.message}\"/>" // Return error XML
             }
+            logLongString("UI_DUMP", stringWriter.toString())
 
             // Return the final XML string
             stringWriter.toString()
@@ -109,6 +110,17 @@ class ScreenInteractionService : AccessibilityService() {
         }
 
         serializer.endTag(null, "node")
+    }
+
+
+    fun logLongString(tag: String, message: String) {
+        val maxLogSize = 2000 // Split into chunks of 2000 characters
+        for (i in 0..message.length / maxLogSize) {
+            val start = i * maxLogSize
+            var end = (i + 1) * maxLogSize
+            end = if (end > message.length) message.length else end
+            Log.d(tag, message.substring(start, end))
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -292,4 +304,74 @@ class ScreenInteractionService : AccessibilityService() {
         }
     }
 
+
+    /**
+     * Traverses the UI tree and returns a list of all enabled, interactable elements.
+     */
+    suspend fun getInteractableElements(): List<InteractableElement> {
+        return withContext(Dispatchers.Default) {
+            val rootNode = rootInActiveWindow
+            if (rootNode == null) {
+                Log.e("InteractionService", "Root node is null, cannot get elements.")
+                return@withContext emptyList<InteractableElement>()
+            }
+
+            val interactableElements = mutableListOf<InteractableElement>()
+            findInteractableNodesRecursive(rootNode, interactableElements)
+            interactableElements
+        }
+    }
+
+    /**
+     * A private recursive helper to find and collect interactable nodes.
+     */
+    private fun findInteractableNodesRecursive(
+        node: android.view.accessibility.AccessibilityNodeInfo?,
+        list: MutableList<InteractableElement>
+    ) {
+        if (node == null) return
+//
+        // =================================================================
+        // THIS IS THE CORE LOGIC: Check if the node is interactable
+        // =================================================================
+//        val isInteractable = (node.isClickable || node.isLongClickable || node.isScrollable || node.isFocusable || node.isLongClickable || node.is) && node.isEnabled
+
+        val bounds = android.graphics.Rect()
+        node.getBoundsInScreen(bounds)
+
+        // We only care about elements that are actually visible on screen
+        if (!bounds.isEmpty) {
+            list.add(
+                InteractableElement(
+                    text = node.text?.toString(),
+                    contentDescription = node.contentDescription?.toString(),
+                    resourceId = node.viewIdResourceName,
+                    className = node.className?.toString(),
+                    bounds = bounds,
+                    node = node // Keep the original node reference to perform actions
+                )
+            )
+        }
+
+        // Continue searching through the children
+        for (i in 0 until node.childCount) {
+            findInteractableNodesRecursive(node.getChild(i), list)
+        }
+    }
+
+}
+
+data class InteractableElement(
+    val text: String?,
+    val contentDescription: String?,
+    val resourceId: String?,
+    val className: String?,
+    val bounds: android.graphics.Rect,
+    // We can also hold a reference to the original node if needed for performing actions
+    val node: android.view.accessibility.AccessibilityNodeInfo
+) {
+    // A helper to get the center coordinates, useful for tapping
+    fun getCenter(): android.graphics.Point {
+        return android.graphics.Point(bounds.centerX(), bounds.centerY())
+    }
 }
