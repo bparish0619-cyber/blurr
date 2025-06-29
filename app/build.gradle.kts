@@ -42,6 +42,8 @@ android {
             // This line CREATES the variable. Make sure it's here and not commented out.
             buildConfigField("String", "GEMINI_API_KEYS", "\"$apiKeys\"")
             buildConfigField("String", "TAVILY_API", "\"$tavilyApiKeys\"")
+            val mem0ApiKey = localProperties.getProperty("MEM0_API") ?: ""
+            buildConfigField("String", "MEM0_API", "\"$mem0ApiKey\"")
 
         }
         debug {
@@ -51,6 +53,8 @@ android {
             // This line must ALSO be here.
             buildConfigField("String", "TAVILY_API", "\"$tavilyApiKeys\"")
             buildConfigField("String", "GEMINI_API_KEYS", "\"$apiKeys\"")
+            val mem0ApiKey = localProperties.getProperty("MEM0_API") ?: ""
+            buildConfigField("String", "MEM0_API", "\"$mem0ApiKey\"")
         }
     }
     compileOptions {

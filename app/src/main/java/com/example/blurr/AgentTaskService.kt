@@ -19,8 +19,10 @@ import com.example.blurr.agent.shortcut.ReflectorShortCut
 import com.example.blurr.agent.tips.ReflectorTips
 import com.example.blurr.api.Eyes
 import com.example.blurr.api.Finger
+import com.example.blurr.api.MemoryService
 import com.example.blurr.api.Retina
 import com.example.blurr.utilities.Persistent
+import com.example.blurr.utilities.UserIdManager
 import com.example.blurr.utilities.addResponse
 import com.example.blurr.utilities.addResponsePrePost
 import com.example.blurr.utilities.getReasoningModelApiResponse
@@ -79,7 +81,7 @@ class AgentTaskService : Service() {
             val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
 
 
-            val shortcutsFile = File(context.filesDir, "shortcuts.json")
+        val shortcutsFile = File(context.filesDir, "shortcuts.json")
             val tipsFile = File(context.filesDir, "tips.txt")
 
 
@@ -124,8 +126,19 @@ class AgentTaskService : Service() {
         var screenshotFile = eyes.openEyes()
 
         var postScreenshotFile: Bitmap?
-            var xmlMode = true
-            while (true) {
+        var xmlMode = true
+
+        // Implementing Memory in the agent
+        val userIdManager = UserIdManager(context)
+        val userId = userIdManager.getOrCreateUserId()
+        val memoryService = MemoryService()
+        CoroutineScope(Dispatchers.IO).launch {
+            memoryService.addMemory(infoPool.instruction, userId)
+        }
+
+        val recalledMemories = memoryService.searchMemory(infoPool.instruction, userId)
+        infoPool.recalledMemories = "No recalledMemories"
+        while (true) {
                 iteration++
 
 //              Iteration LIMIT
