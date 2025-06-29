@@ -152,7 +152,12 @@ class AgentTaskService : Service() {
                     val lastKActionsSet = mutableSetOf<String>()
                     try {
                         for (actStr in lastKActions) {
-                            val actObj = JSONObject(actStr) // Assuming actStr is a JSON string
+                            val sanitizedJson = actStr
+                                .replace("```json", "")
+                                .replace("```", "")
+                                .trim()
+
+                            val actObj = JSONObject(sanitizedJson) // Assuming actStr is a JSON string
                             var hashKey = if (actObj.has("name")) actObj.getString("name") else actStr
                             if (actObj.has("arguments")) {
                                 val arguments = actObj.optJSONObject("arguments")
