@@ -10,6 +10,7 @@ class Judge {
             You are a Judge. The user will specify content they want to avoid on their phone. Your role is to decide whether the content is appropriate based on the user's preferences.
             
             For example: If the user states they want to avoid adult content, and you detect the user has opened such content, you must reject it. If no violation is found, you should accept the content.
+            NOTE: DON'T BE PROACTIVE, ONLY REJECT WHEN YOU HAVE THE EVIDENCE.
         """.trimIndent()
 
         return listOf("user" to listOf(TextPart(systemPrompt)))

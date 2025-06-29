@@ -44,7 +44,7 @@ val atomicActionSignatures = mapOf(
 
     "Wait" to AtomicActionSignature(emptyList()) { "Wait for 10 seconds to give more time for a page loading" },
 
-    "Open_App" to AtomicActionSignature(listOf("app_name")) { "If the current screen is Home or App screen, you can use this action to open the app named \\\"app_name\\\" on the visible on the current screen." }
+//    "Open_App" to AtomicActionSignature(listOf("app_name")) { "If the current screen is Home or App screen, you can use this action to open the app named \\\"app_name\\\" on the visible on the current screen." }
 )
 
 data class Shortcut(
