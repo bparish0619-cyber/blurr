@@ -1,6 +1,6 @@
 # 🐼 Panda: Your Personal AI Phone Operator
 
-**You touch grass. I'll touch glass.**
+**You touch grass. I'll touch your glass.**
 
 ---
 
