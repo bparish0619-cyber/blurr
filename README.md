@@ -4,7 +4,7 @@
 
 ---
 
-![Panda AI Home Screen]([https://i.imgur.com/gKzG7S2.png](https://github.com/user-attachments/assets/9ef3993c-9719-448e-a968-d6889373a677) 
+![Panda AI Home Screen]([(https://github.com/user-attachments/assets/9ef3993c-9719-448e-a968-d6889373a677]) 
 
 
 **Panda** is a proactive, on-device AI agent for Android that autonomously understands natural language commands and operates your phone's UI to achieve them. Inspired by the need to make modern technology more accessible, Panda acts as your personal operator, capable of handling complex, multi-step tasks across different applications.
