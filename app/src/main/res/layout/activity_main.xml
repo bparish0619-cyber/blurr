@@ -91,6 +91,57 @@
                 android:textColor="#CECECE"
                 android:textColorHint="#888888" />
 
+            <!-- Vision Mode Selection -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/vision_mode"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <RadioGroup
+                android:id="@+id/visionModeGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal"
+                android:background="@drawable/rounded_background"
+                android:padding="12dp">
+
+                <RadioButton
+                    android:id="@+id/xmlModeRadio"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:checked="true"
+                    android:text="@string/xml_mode"
+                    android:textColor="#CECECE"
+                    android:buttonTint="#5880F7" />
+
+                <RadioButton
+                    android:id="@+id/screenshotModeRadio"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/screenshot_mode"
+                    android:textColor="#CECECE"
+                    android:buttonTint="#5880F7" />
+
+            </RadioGroup>
+
+            <!-- Vision Mode Description -->
+            <TextView
+                android:id="@+id/visionModeDescription"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/xml_mode_description"
+                android:textColor="#888888"
+                android:textSize="12sp"
+                android:gravity="center" />
+
             <!-- Perform Task Button -->
             <TextView
                 android:id="@+id/performTaskButton"

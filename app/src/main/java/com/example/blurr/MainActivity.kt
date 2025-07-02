@@ -40,6 +40,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var stopAgent : Button
     private lateinit var grantPermission: Button
     private lateinit var tvPermissionStatus: TextView
+    private lateinit var visionModeGroup: RadioGroup
+    private lateinit var xmlModeRadio: RadioButton
+    private lateinit var screenshotModeRadio: RadioButton
+    private lateinit var visionModeDescription: TextView
 
     private lateinit var ttsManager: TTSManager
     private lateinit var deepSearchAgent: DeepSearch
@@ -76,6 +80,10 @@ class MainActivity : AppCompatActivity() {
         performTaskButton = findViewById(R.id.performTaskButton)
         contentModerationButton = findViewById(R.id.contentMoniterButton)
         statusText = findViewById(R.id.tv_service_status)
+        visionModeGroup = findViewById(R.id.visionModeGroup)
+        xmlModeRadio = findViewById(R.id.xmlModeRadio)
+        screenshotModeRadio = findViewById(R.id.screenshotModeRadio)
+        visionModeDescription = findViewById(R.id.visionModeDescription)
 
         grantPermission.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
@@ -85,6 +93,7 @@ class MainActivity : AppCompatActivity() {
         ttsManager = TTSManager(this)
         deepSearchAgent = DeepSearch()
         setupClickListeners()
+        setupVisionModeListener()
         handler = Handler(Looper.getMainLooper())
 
 
@@ -136,8 +145,13 @@ class MainActivity : AppCompatActivity() {
                     statusText.text = "Agent started to perform task..."
                     Toast.makeText(this@MainActivity, "Agent Task Started", Toast.LENGTH_SHORT).show()
 
+                    // Determine vision mode based on radio button selection
+                    val visionMode = if (xmlModeRadio.isChecked) "XML" else "SCREENSHOT"
+                    Log.d("MainActivity", "Selected vision mode: $visionMode")
+
                     val serviceIntent = Intent(this@MainActivity, AgentTaskService::class.java).apply {
                         putExtra("TASK_INSTRUCTION", instruction)
+                        putExtra("VISION_MODE", visionMode)
                     }
                     startService(serviceIntent)
                     val fin = Finger(this@MainActivity)
@@ -173,6 +187,16 @@ class MainActivity : AppCompatActivity() {
 
                 updateUI()
                 Toast.makeText(this@MainActivity, "Content Moderation Started", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun setupVisionModeListener() {
+        visionModeGroup.setOnCheckedChangeListener { _, checkedId ->
+            visionModeDescription.text = when (checkedId) {
+                R.id.xmlModeRadio -> getString(R.string.xml_mode_description)
+                R.id.screenshotModeRadio -> getString(R.string.screenshot_mode_description)
+                else -> getString(R.string.xml_mode_description)
             }
         }
     }
