@@ -22,6 +22,7 @@ import com.example.blurr.api.Finger
 import com.example.blurr.api.MemoryService
 import com.example.blurr.api.Retina
 import com.example.blurr.utilities.Persistent
+import com.example.blurr.utilities.TTSManager
 import com.example.blurr.utilities.UserIdManager
 import com.example.blurr.utilities.addResponse
 import com.example.blurr.utilities.addResponsePrePost
@@ -75,7 +76,7 @@ class AgentTaskService : Service() {
     @RequiresApi(Build.VERSION_CODES.R)
     private suspend fun runAgentLogic(inputText: String) {
             delay(2000)
-
+        val tts = TTSManager(this)
         val taskStartTime = System.currentTimeMillis()
             val context = this
             val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
@@ -206,6 +207,12 @@ class AgentTaskService : Service() {
                     val screenshotPath = File(screenshotsDir, "screenshot.jpg")
 //                    screenshotFile.copyTo(screenshotPath, overwrite = true)
 //                    val lastScreenshotFile = screenshotPath // Store for potential removal
+//                    for (i in 0 until 100){
+//                        val (perceptionInfos, width, height, keyboardOn) = retina.getPerceptionInfos(
+//                            context, screenshotFile
+//                        )
+//                        println("Try number $i ")
+//                    }
                     val (perceptionInfos, width, height, keyboardOn) = retina.getPerceptionInfos(
                         context, screenshotFile
                     )
@@ -257,13 +264,17 @@ class AgentTaskService : Service() {
                 val chatPlan = manager.initChat()
                 val combinedChatPlan  = addResponse("user",promptPlan, chatPlan, screenshotFile )
                 // Request to Gemini
+//            for (i in 0 until 100){
+//                val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = API_KEY)
+//                println("Try number : $i")
+//            }
                 val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = API_KEY)
                 val parsedManagerPlan = manager.parseResponse(outputPlan.toString())
 
                 // Updating the InfoPool
                 infoPool.plan = parsedManagerPlan["plan"].toString()
                 infoPool.currentSubgoal =  parsedManagerPlan["current_subgoal"].toString()
-
+                tts.speakText(infoPool.currentSubgoal)
                 appendToFile(taskLog, "{ \n" +
                         "                    \"step\": $iteration, \n" +
                         "                    \"operation\": \"planning\", \n" +
@@ -328,6 +339,7 @@ class AgentTaskService : Service() {
                     val taskEndTime = System.currentTimeMillis()
                     appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: success, final_info_pool: $infoPool, task_duration: ${(taskEndTime - taskStartTime)/1000} seconds}")
                     Log.i("MainActivity", "Task finished successfully by planner.")
+                    tts.speakText("Task finished")
                     return
                 }
 
@@ -438,7 +450,7 @@ class AgentTaskService : Service() {
 
                 var actionOutcome: String
                 var currentErrorDescription = errorDescription
-
+                tts.speakText("Outcome was $outcome")
                 when {
                     "A" in outcome -> { // Successful. The result of the last action meets the expectation.
                         actionOutcome = "A"
@@ -493,27 +505,27 @@ class AgentTaskService : Service() {
 
                 // NoteTaker: Record Important Content
                 if (actionOutcome == "A") {
-                    Log.d("MainActivity", "\n### NoteKeeper ... ###\n")
-                    val noteTakingStartTime = System.currentTimeMillis()
-                    val promptNote = noteTaker.getPrompt(infoPool)
-                    var chatNote = noteTaker.initChat()
-                    var combined = addResponse("user", promptNote, chatNote, postScreenshotFile) // Use the post-action screenshot
-                    val outputNote = getReasoningModelApiResponse(combined, apiKey = API_KEY)
-                    val parsedResultNote = noteTaker.parseResponse(outputNote.toString())
-                    val importantNotes = parsedResultNote["important_notes"].toString()
-                    infoPool.importantNotes = importantNotes
+//                    Log.d("MainActivity", "\n### NoteKeeper ... ###\n")
+//                    val noteTakingStartTime = System.currentTimeMillis()
+//                    val promptNote = noteTaker.getPrompt(infoPool)
+//                    var chatNote = noteTaker.initChat()
+//                    var combined = addResponse("user", promptNote, chatNote, postScreenshotFile) // Use the post-action screenshot
+//                    val outputNote = getReasoningModelApiResponse(combined, apiKey = API_KEY)
+//                    val parsedResultNote = noteTaker.parseResponse(outputNote.toString())
+//                    val importantNotes = parsedResultNote["important_notes"].toString()
+//                    infoPool.importantNotes = importantNotes
 
 
-                    val noteTakingEndTime = System.currentTimeMillis()
-                    appendToFile(taskLog, "{\n" +
-                            "    \"step\": $iteration,\n" +
-                            "    \"operation\": \"notetaking\",\n" +
-                            "    \"prompt_note\": \"$promptNote\",\n" +
-                            "    \"raw_response\": \"$outputNote\",\n" +
-                            "    \"important_notes\": \"$importantNotes\",\n" +
-                            "    \"duration\": ${(noteTakingEndTime - noteTakingStartTime) / 1000}\n" +
-                            "}")
-                    Log.d("MainActivity", "Important Notes: $importantNotes")
+//                    val noteTakingEndTime = System.currentTimeMillis()
+//                    appendToFile(taskLog, "{\n" +
+//                            "    \"step\": $iteration,\n" +
+//                            "    \"operation\": \"notetaking\",\n" +
+//                            "    \"prompt_note\": \"$promptNote\",\n" +
+//                            "    \"raw_response\": \"$outputNote\",\n" +
+//                            "    \"important_notes\": \"$importantNotes\",\n" +
+//                            "    \"duration\": ${(noteTakingEndTime - noteTakingStartTime) / 1000}\n" +
+//                            "}")
+//                    Log.d("MainActivity", "Important Notes: $importantNotes")
                 }
 
                 screenshotFile = postScreenshotFile
