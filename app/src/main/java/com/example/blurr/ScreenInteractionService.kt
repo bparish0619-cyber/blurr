@@ -24,6 +24,15 @@ import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlSerializer
 import java.io.StringWriter
 import kotlin.coroutines.resumeWithException
+import android.content.Context
+import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
+import android.view.Gravity
+import android.view.WindowManager
+import android.widget.ImageView
 
 
 class ScreenInteractionService : AccessibilityService() {
@@ -40,6 +49,61 @@ class ScreenInteractionService : AccessibilityService() {
         super.onServiceConnected()
         instance = this
         Log.d("InteractionService", "Accessibility Service connected.")
+    }
+    @RequiresApi(Build.VERSION_CODES.O)
+
+
+    private fun showDebugTap(tapX: Float, tapY: Float) {
+        // Check if we have the necessary permission to draw overlays
+        if (!Settings.canDrawOverlays(this)) {
+            Log.w("InteractionService", "Cannot show debug tap: 'Draw over other apps' permission not granted.")
+            return
+        }
+
+        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val overlayView = ImageView(this)
+
+        // Programmatically create a red circle drawable
+        val tapIndicator = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(0x80FF0000.toInt()) // Semi-transparent red
+            setSize(100, 100)
+            setStroke(4, 0xFFFF0000.toInt()) // Solid red border
+        }
+        overlayView.setImageDrawable(tapIndicator)
+
+        // ================================== THE FIX ==================================
+        // Initialize with basic parameters first.
+        val params = WindowManager.LayoutParams(
+            100, // width
+            100, // height
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        )
+
+        // Explicitly set the gravity and absolute coordinates.
+        // This ensures the (x, y) values are treated as absolute positions
+        // from the top-left corner of the screen.
+        params.gravity = Gravity.TOP or Gravity.START
+        params.x = tapX.toInt() - 50 // Offset to center the 100x100 circle
+        params.y = tapY.toInt() - 50 // Offset to center the 100x100 circle
+        // ===========================================================================
+
+        // UI operations must be on the main thread
+        Handler(Looper.getMainLooper()).post {
+            try {
+                windowManager.addView(overlayView, params)
+                // Schedule the removal of the view after a short duration
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (overlayView.isAttachedToWindow) {
+                        windowManager.removeView(overlayView)
+                    }
+                }, 500L) // Display for 500 milliseconds
+            } catch (e: Exception) {
+                Log.e("InteractionService", "Failed to add debug tap view", e)
+            }
+        }
     }
 
     suspend fun dumpWindowHierarchy(): String {
@@ -138,6 +202,8 @@ class ScreenInteractionService : AccessibilityService() {
     }
 
     fun clickOnPoint(x: Float, y: Float) {
+        showDebugTap(x, y)
+
         val path = Path().apply {
             moveTo(x, y)
         }
