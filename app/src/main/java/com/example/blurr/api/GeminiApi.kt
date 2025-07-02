@@ -29,11 +29,11 @@ object GeminiApi {
         prompt: String,
         images: List<Bitmap> = emptyList(),
         modelName: String = "gemini-2.0-flash",
-        maxRetry: Int = 3
+        maxRetry: Int = 4
     ): String? {
         // Get a new key for this specific request.
         val currentApiKey = ApiKeyManager.getNextKey()
-        Log.d("GeminiApi", "Using API key ending in: ...${currentApiKey.takeLast(4)}")
+        Log.d("GeminiApi", "Using API key ending in: ...${currentApiKey}")
 
         var attempts = 0
         while (attempts < maxRetry) {

@@ -173,7 +173,7 @@ class ScreenInteractionService : AccessibilityService() {
         if (focusedNode != null && focusedNode.isEditable) {
             val arguments = Bundle()
             // To append text rather than replacing it, we get existing text first
-            val existingText = focusedNode.text ?: ""
+            val existingText =  ""
             val newText = existingText.toString() + textToType
 
             arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
