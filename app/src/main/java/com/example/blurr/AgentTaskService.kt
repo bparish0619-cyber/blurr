@@ -50,16 +50,18 @@ class AgentTaskService : Service() {
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val inputText = intent?.getStringExtra("TASK_INSTRUCTION")
+        val visionMode = intent?.getStringExtra("VISION_MODE") ?: "XML" // Default to XML mode
+        
         if (inputText == null) {
             Log.e("AgentTaskService", "Service started without user input. Stopping.")
             stopSelf()
             return START_NOT_STICKY
         }
 
-        Log.d("AgentTaskService", "Starting agent task with input: $inputText")
+        Log.d("AgentTaskService", "Starting agent task with input: $inputText, vision mode: $visionMode")
 
         agentJob = CoroutineScope(Dispatchers.IO).launch {
-            runAgentLogic(inputText)
+            runAgentLogic(inputText, visionMode)
 
             Log.d("AgentTaskService", "Agent task finished. Stopping service.")
             stopSelf()
@@ -74,7 +76,7 @@ class AgentTaskService : Service() {
 
 
     @RequiresApi(Build.VERSION_CODES.R)
-    private suspend fun runAgentLogic(inputText: String) {
+    private suspend fun runAgentLogic(inputText: String, visionMode: String) {
             delay(2000)
         val tts = TTSManager(this)
         val taskStartTime = System.currentTimeMillis()
@@ -122,12 +124,12 @@ class AgentTaskService : Service() {
                 infoPool.shortcuts = operator.initShortcuts
             }
 
-            appendToFile(taskLog, "{step: 0, operation: init, instruction: $inputText, maxItr: $maxItr }")
+            appendToFile(taskLog, "{step: 0, operation: init, instruction: $inputText, maxItr: $maxItr, vision_mode: $visionMode }")
 
         var screenshotFile = eyes.openEyes()
 
         var postScreenshotFile: Bitmap?
-        var xmlMode = true
+        val xmlMode = visionMode == "XML"
 
         // Implementing Memory in the agent
         val userIdManager = UserIdManager(context)
@@ -138,7 +140,7 @@ class AgentTaskService : Service() {
         }
 
         val recalledMemories = memoryService.searchMemory(infoPool.instruction, userId)
-        infoPool.recalledMemories = "No recalledMemories"
+//        infoPool.recalledMemories = "No recalledMemories"
         while (true) {
                 iteration++
 
@@ -231,6 +233,7 @@ class AgentTaskService : Service() {
                         val xml = eyes.openXMLEyes()
                         println(xml)
                         infoPool.perceptionInfosPreXML = xml
+                        delay(10000)
                     }
                     if(perceptionInfos.isEmpty()) {
 //                        println(bitmap)
@@ -260,9 +263,13 @@ class AgentTaskService : Service() {
 
                 // Step 2: Manager Planning
                 val managerPlanningStart = System.currentTimeMillis()
-                val promptPlan = manager.getPrompt(infoPool)
+                val promptPlan = manager.getPrompt(infoPool, xmlMode)
                 val chatPlan = manager.initChat()
-                val combinedChatPlan  = addResponse("user",promptPlan, chatPlan, screenshotFile )
+                val combinedChatPlan = if (xmlMode) {
+                    addResponse("user", promptPlan, chatPlan)
+                } else {
+                    addResponse("user", promptPlan, chatPlan, screenshotFile)
+                }
                 // Request to Gemini
 //            for (i in 0 until 100){
 //                val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = API_KEY)
@@ -298,10 +305,9 @@ class AgentTaskService : Service() {
                         val experienceReflectionStartTime = System.currentTimeMillis()
 
                         // Shortcuts
-                        val promptKnowledgeShortcuts = reflectorShortCut.getPrompt(infoPool)
+                        val promptKnowledgeShortcuts = reflectorShortCut.getPrompt(infoPool, xmlMode)
                         var chatKnowledgeShortcuts = reflectorShortCut.initChat()
-                        var combined =
-                            addResponse("user", promptKnowledgeShortcuts, chatKnowledgeShortcuts)
+                        var combined = addResponse("user", promptKnowledgeShortcuts, chatKnowledgeShortcuts)
                         val outputKnowledgeShortcuts = getReasoningModelApiResponse(combined, apiKey = API_KEY) // Assuming KNOWLEDGE_REFLECTION_MODEL is similar to other models
                         val parsedResultKnowledgeShortcuts = reflectorShortCut.parseResponse(
                             outputKnowledgeShortcuts.toString()
@@ -313,7 +319,7 @@ class AgentTaskService : Service() {
                         Log.d("MainActivity", "New Shortcut: $newShortcutStr")
 
                         // Tips
-                        val promptKnowledgeTips = reflectorTips.getPrompt(infoPool)
+                        val promptKnowledgeTips = reflectorTips.getPrompt(infoPool, xmlMode)
                         var chatKnowledgeTips = reflectorTips.initChat()
                         var combinedTips = addResponse("user", promptKnowledgeTips, chatKnowledgeTips)
                         val outputKnowledgeTips = getReasoningModelApiResponse(combinedTips, apiKey = API_KEY) // Assuming KNOWLEDGE_REFLECTION_MODEL
@@ -345,9 +351,13 @@ class AgentTaskService : Service() {
 
                 var actionThinkingTimeStart = System.currentTimeMillis()
                 // Step 3 Operator's turn, he will execute on the plan of manager
-                val actionPrompt = operator.getPrompt(infoPool)
+                val actionPrompt = operator.getPrompt(infoPool, xmlMode)
                 val actionChat = operator.initChat()
-                val actionCombinedChat  = addResponse("user",actionPrompt, actionChat, screenshotFile )
+                val actionCombinedChat = if (xmlMode) {
+                    addResponse("user", actionPrompt, actionChat)
+                } else {
+                    addResponse("user", actionPrompt, actionChat, screenshotFile)
+                }
                 var actionOutput = getReasoningModelApiResponse(actionCombinedChat, apiKey = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
                 var parsedAction = operator.parseResponse(actionOutput.toString())
                 var actionThought = parsedAction["thought"]
@@ -423,8 +433,8 @@ class AgentTaskService : Service() {
                         }, duration: ${(perceptionPostEndTime - perceptionPostStartTime) / 1000} seconds}"
                     )
                     infoPool.perceptionInfosPost = postPerceptionInfos as MutableList<ClickableInfo>
-                    eyes.openXMLEyes()
                     val xmlPost = eyes.openXMLEyes()
+                    println(xmlPost)
                     infoPool.perceptionInfosPostXML = xmlPost
                     infoPool.keyboardPost = keyBoardOnPost
                 }
@@ -433,9 +443,13 @@ class AgentTaskService : Service() {
 
 //                Step5 The Reflector of our actions
                 val reflectionStartTime = System.currentTimeMillis()
-                val reflectionPrompt = actionReflector.getPrompt(infoPool)
+                val reflectionPrompt = actionReflector.getPrompt(infoPool, xmlMode)
                 val reflectionChat = actionReflector.initChat()
-                val reflectionCombinedChat  = addResponsePrePost("user",reflectionPrompt, reflectionChat, screenshotFile, postScreenshotFile )
+                val reflectionCombinedChat = if (xmlMode) {
+                    addResponse("user", reflectionPrompt, reflectionChat)
+                } else {
+                    addResponsePrePost("user", reflectionPrompt, reflectionChat, screenshotFile, postScreenshotFile)
+                }
 
                 // Sending to the GEMINI
                 val reflectionLLMOutput = getReasoningModelApiResponse(reflectionCombinedChat, apiKey = API_KEY)
@@ -505,27 +519,30 @@ class AgentTaskService : Service() {
 
                 // NoteTaker: Record Important Content
                 if (actionOutcome == "A") {
-//                    Log.d("MainActivity", "\n### NoteKeeper ... ###\n")
-//                    val noteTakingStartTime = System.currentTimeMillis()
-//                    val promptNote = noteTaker.getPrompt(infoPool)
-//                    var chatNote = noteTaker.initChat()
-//                    var combined = addResponse("user", promptNote, chatNote, postScreenshotFile) // Use the post-action screenshot
-//                    val outputNote = getReasoningModelApiResponse(combined, apiKey = API_KEY)
-//                    val parsedResultNote = noteTaker.parseResponse(outputNote.toString())
-//                    val importantNotes = parsedResultNote["important_notes"].toString()
-//                    infoPool.importantNotes = importantNotes
+                    Log.d("MainActivity", "\n### NoteKeeper ... ###\n")
+                    val noteTakingStartTime = System.currentTimeMillis()
+                    val promptNote = noteTaker.getPrompt(infoPool, xmlMode)
+                    var chatNote = noteTaker.initChat()
+                    var combined = if (xmlMode) {
+                        addResponse("user", promptNote, chatNote)
+                    } else {
+                        addResponse("user", promptNote, chatNote, postScreenshotFile) // Use the post-action screenshot
+                    }
+                    val outputNote = getReasoningModelApiResponse(combined, apiKey = API_KEY)
+                    val parsedResultNote = noteTaker.parseResponse(outputNote.toString())
+                    val importantNotes = parsedResultNote["important_notes"].toString()
+                    infoPool.importantNotes = importantNotes
 
-
-//                    val noteTakingEndTime = System.currentTimeMillis()
-//                    appendToFile(taskLog, "{\n" +
-//                            "    \"step\": $iteration,\n" +
-//                            "    \"operation\": \"notetaking\",\n" +
-//                            "    \"prompt_note\": \"$promptNote\",\n" +
-//                            "    \"raw_response\": \"$outputNote\",\n" +
-//                            "    \"important_notes\": \"$importantNotes\",\n" +
-//                            "    \"duration\": ${(noteTakingEndTime - noteTakingStartTime) / 1000}\n" +
-//                            "}")
-//                    Log.d("MainActivity", "Important Notes: $importantNotes")
+                    val noteTakingEndTime = System.currentTimeMillis()
+                    appendToFile(taskLog, "{\n" +
+                            "    \"step\": $iteration,\n" +
+                            "    \"operation\": \"notetaking\",\n" +
+                            "    \"prompt_note\": \"$promptNote\",\n" +
+                            "    \"raw_response\": \"$outputNote\",\n" +
+                            "    \"important_notes\": \"$importantNotes\",\n" +
+                            "    \"duration\": ${(noteTakingEndTime - noteTakingStartTime) / 1000}\n" +
+                            "}")
+                    Log.d("MainActivity", "Important Notes: $importantNotes")
                 }
 
                 screenshotFile = postScreenshotFile

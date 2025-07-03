@@ -12,4 +12,9 @@
     <string name="grant_accessibility_permission">Grant Accessibility Permission</string>
     <string name="permission_not_granted">Permission: Not Granted</string>
     <string name="service_status_stopped">Service Status: Stopped</string>
+    <string name="vision_mode">Vision Mode:</string>
+    <string name="xml_mode">XML Mode</string>
+    <string name="screenshot_mode">Screenshot Mode</string>
+    <string name="xml_mode_description">Uses UI structure data (faster, less resource intensive)</string>
+    <string name="screenshot_mode_description">Uses actual screenshots (more accurate, higher resource usage)</string>
 </resources>
