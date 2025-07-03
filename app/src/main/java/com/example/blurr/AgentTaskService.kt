@@ -140,7 +140,7 @@ class AgentTaskService : Service() {
         }
 
         val recalledMemories = memoryService.searchMemory(infoPool.instruction, userId)
-        infoPool.recalledMemories = "No recalledMemories"
+//        infoPool.recalledMemories = "No recalledMemories"
         while (true) {
                 iteration++
 
@@ -233,6 +233,7 @@ class AgentTaskService : Service() {
                         val xml = eyes.openXMLEyes()
                         println(xml)
                         infoPool.perceptionInfosPreXML = xml
+                        delay(10000)
                     }
                     if(perceptionInfos.isEmpty()) {
 //                        println(bitmap)
@@ -432,8 +433,8 @@ class AgentTaskService : Service() {
                         }, duration: ${(perceptionPostEndTime - perceptionPostStartTime) / 1000} seconds}"
                     )
                     infoPool.perceptionInfosPost = postPerceptionInfos as MutableList<ClickableInfo>
-                    eyes.openXMLEyes()
                     val xmlPost = eyes.openXMLEyes()
+                    println(xmlPost)
                     infoPool.perceptionInfosPostXML = xmlPost
                     infoPool.keyboardPost = keyBoardOnPost
                 }

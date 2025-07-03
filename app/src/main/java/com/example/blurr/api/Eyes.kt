@@ -37,6 +37,7 @@ class Eyes(context: Context) {
     /**
      * Dumps the current UI layout to an XML file using the Accessibility Service.
      */
+    @RequiresApi(Build.VERSION_CODES.O)
     suspend fun openXMLEyes(): String {
         val service = ScreenInteractionService.instance
         if (service == null) {
