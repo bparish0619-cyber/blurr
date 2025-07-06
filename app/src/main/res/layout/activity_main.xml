@@ -142,12 +142,58 @@
                 android:textSize="12sp"
                 android:gravity="center" />
 
+            <!-- Voice Input Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="@string/voice_input"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="(Auto-execute)"
+                    android:textColor="#888888"
+                    android:textSize="12sp" />
+
+                <ImageButton
+                    android:id="@+id/voiceInputButton"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:background="@drawable/voice_input_button_bg"
+                    android:contentDescription="@string/hold_to_speak"
+                    android:src="@drawable/ic_mic"
+                    android:scaleType="centerInside"
+                    android:padding="16dp" />
+
+                <TextView
+                    android:id="@+id/voiceStatusText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/hold_to_speak"
+                    android:textColor="#888888"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
+
             <!-- Perform Task Button -->
             <TextView
                 android:id="@+id/performTaskButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="16dp"
                 android:background="@drawable/rounded_button"
                 android:clickable="true"
                 android:focusable="true"
@@ -156,7 +202,6 @@
                 android:text="@string/perform_task"
                 android:textColor="@android:color/white"
                 android:textSize="16sp" />
-
 
             <TextView
                 android:id="@+id/tv_service_status"
