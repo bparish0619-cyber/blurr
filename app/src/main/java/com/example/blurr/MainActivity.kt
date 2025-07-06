@@ -25,11 +25,16 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.blurr.agent.DeepSearch
 import com.example.blurr.agent.VisionMode
+import com.example.blurr.agent.ClarificationAgent
+import com.example.blurr.agent.InfoPool
+import com.example.blurr.agent.AgentConfig
 import com.example.blurr.utilities.TTSManager
 import com.example.blurr.utilities.STTManager
 import com.example.blurr.utilities.UserIdManager
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
+import com.example.blurr.agent.VisionHelper
+import com.example.blurr.utilities.getReasoningModelApiResponse
 
 class MainActivity : AppCompatActivity() {
 
@@ -39,8 +44,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var performTaskButton: TextView
     private lateinit var contentModerationButton: TextView
     private lateinit var handler: Handler
-    private lateinit var startAgent : Button
-    private lateinit var stopAgent : Button
     private lateinit var grantPermission: Button
     private lateinit var tvPermissionStatus: TextView
     private lateinit var visionModeGroup: RadioGroup
@@ -53,6 +56,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var ttsManager: TTSManager
     private lateinit var sttManager: STTManager
     private lateinit var deepSearchAgent: DeepSearch
+    private lateinit var clarificationAgent: ClarificationAgent
     private lateinit var userId: String
 
     private val requestPermissionLauncher =
@@ -65,6 +69,20 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Permission denied. Some features may not work properly.", Toast.LENGTH_LONG).show()
             }
         }
+
+    private val dialogueLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val enhancedInstruction = result.data?.getStringExtra(DialogueActivity.EXTRA_ENHANCED_INSTRUCTION)
+            if (!enhancedInstruction.isNullOrEmpty()) {
+                // Execute the enhanced instruction
+                executeTask(enhancedInstruction)
+            }
+        } else if (result.resultCode == RESULT_CANCELED) {
+            Toast.makeText(this, "Dialogue cancelled", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -101,6 +119,7 @@ class MainActivity : AppCompatActivity() {
         ttsManager = TTSManager(this)
         sttManager = STTManager(this)
         deepSearchAgent = DeepSearch()
+        clarificationAgent = ClarificationAgent()
         setupClickListeners()
         setupVisionModeListener()
         setupVoiceInput()
@@ -145,32 +164,24 @@ class MainActivity : AppCompatActivity() {
             performTaskButton.isEnabled = false
 
             lifecycleScope.launch {
-                val finalAnswer = deepSearchAgent.execute(instruction)
-                if(instruction == "a"){
-                    ttsManager.speakText("I am ready to win Hundred Agents Hackathon, and start new era of personal agents")
-                    return@launch
-                }
-                if (finalAnswer == "NO-SEARCH") {
-                    Log.d("MainActivity", "This is a UI Task. Starting AgentTaskService.")
-                    statusText.text = "Agent started to perform task..."
-                    Toast.makeText(this@MainActivity, "Agent Task Started", Toast.LENGTH_SHORT).show()
-
-                    // Determine vision mode based on radio button selection
-                    val visionMode = if (xmlModeRadio.isChecked) VisionMode.XML.name else VisionMode.SCREENSHOT.name
-                    Log.d("MainActivity", "Selected vision mode: $visionMode")
-
-                    val serviceIntent = Intent(this@MainActivity, AgentTaskService::class.java).apply {
-                        putExtra("TASK_INSTRUCTION", instruction)
-                        putExtra("VISION_MODE", visionMode)
+                try {
+                    // Check if clarification is needed
+                    val needsClarification = checkIfClarificationNeeded(instruction)
+                    
+                    if (needsClarification.first) {
+                        // Start dialogue for clarification
+                        startClarificationDialogue(instruction, needsClarification.second)
+                    } else {
+                        // Execute the task directly
+                        executeTask(instruction)
                     }
-                    startService(serviceIntent)
-                    val fin = Finger(this@MainActivity)
-                    fin.home()
-                } else {
-                    println("Final Answer: $finalAnswer")
-                    Log.d("MainActivity", "Deep Search complete. Answer: $finalAnswer")
-                    statusText.text = finalAnswer
-                    ttsManager.speakText(finalAnswer)
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Error processing instruction", e)
+                    val errorMessage = "Error processing your instruction: ${e.message}"
+                    statusText.text = errorMessage
+                    ttsManager.speakText(errorMessage)
+                } finally {
+                    performTaskButton.isEnabled = true
                 }
             }
         }
@@ -266,6 +277,73 @@ class MainActivity : AppCompatActivity() {
         
         lifecycleScope.launch {
             try {
+                // Check if clarification is needed
+                val needsClarification = checkIfClarificationNeeded(instruction)
+                
+                if (needsClarification.first) {
+                    // Start dialogue for clarification
+                    startClarificationDialogue(instruction, needsClarification.second)
+                } else {
+                    // Execute the task directly
+                    executeTask(instruction)
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error processing voice command", e)
+                val errorMessage = "Error processing your command: ${e.message}"
+                statusText.text = errorMessage
+                ttsManager.speakText(errorMessage)
+            }
+        }
+    }
+
+    private suspend fun checkIfClarificationNeeded(instruction: String): Pair<Boolean, List<String>> {
+        try {
+            // Create a temporary InfoPool for the clarification agent
+            val tempInfoPool = InfoPool(instruction = instruction)
+            println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            // Get clarification response
+            val config = AgentConfig(visionMode = VisionMode.XML, apiKey = "", context = this)
+            val prompt = clarificationAgent.getPrompt(tempInfoPool, config)
+            val chat = clarificationAgent.initChat()
+            val combined = VisionHelper.createChatResponse(
+                "user",
+                prompt,
+                chat,
+                config
+            )
+            val response = withContext(Dispatchers.IO) {
+                getReasoningModelApiResponse(combined, apiKey = config.apiKey)
+            }
+            println(response)
+            val parsedResult = clarificationAgent.parseResponse(response.toString())
+            println(parsedResult)
+            val status = parsedResult["status"] ?: "CLEAR"
+            val questionsText = parsedResult["questions"] ?: ""
+            println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+
+            return if (status == "NEEDS_CLARIFICATION" && questionsText.isNotEmpty()) {
+                val questions = clarificationAgent.parseQuestions(questionsText)
+                Pair(true, questions)
+            } else {
+                Pair(false, emptyList())
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error checking clarification", e)
+            return Pair(false, emptyList())
+        }
+    }
+
+    private fun startClarificationDialogue(originalInstruction: String, questions: List<String>) {
+        val intent = Intent(this, DialogueActivity::class.java).apply {
+            putExtra(DialogueActivity.EXTRA_ORIGINAL_INSTRUCTION, originalInstruction)
+            putExtra(DialogueActivity.EXTRA_QUESTIONS, ArrayList(questions))
+        }
+        dialogueLauncher.launch(intent)
+    }
+
+    private fun executeTask(instruction: String) {
+        lifecycleScope.launch {
+            try {
                 // Announce the task being performed
                 val announcement = "I will perform the task: $instruction"
                 ttsManager.speakText(announcement)
@@ -305,8 +383,8 @@ class MainActivity : AppCompatActivity() {
                     ttsManager.speakText(finalAnswer)
                 }
             } catch (e: Exception) {
-                Log.e("MainActivity", "Error processing voice command", e)
-                val errorMessage = "Error processing your command: ${e.message}"
+                Log.e("MainActivity", "Error executing task", e)
+                val errorMessage = "Error executing task: ${e.message}"
                 statusText.text = errorMessage
                 ttsManager.speakText(errorMessage)
             }

@@ -41,6 +41,13 @@
             android:label="@string/app_name"
             android:theme="@style/Theme.Blurr">
         </activity>
+        <activity
+            android:name=".DialogueActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Blurr"
+            android:windowSoftInputMode="adjustResize">
+        </activity>
         <!-- The Accessibility Service declaration -->
         <service
             android:name=".ScreenInteractionService"

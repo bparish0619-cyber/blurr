@@ -26,4 +26,10 @@
     <string name="processing_voice_command">Processing voice command...</string>
     <string name="performing_task">I will perform the task: %s</string>
     <string name="starting_agent_task">Starting agent task for: %s</string>
+    <string name="clarification_needed">Clarification needed</string>
+    <string name="dialogue_cancelled">Dialogue cancelled</string>
+    <string name="submit_answer">Submit Answer</string>
+    <string name="cancel">Cancel</string>
+    <string name="type_answer_here">Type your answer here...</string>
+    <string name="or_use_voice_input">Or use voice input</string>
 </resources>

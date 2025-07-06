@@ -120,7 +120,7 @@ object GeminiApi {
                 
                 Log.e("GeminiApi", "=== GEMINI API ERROR (Attempt ${attempts + 1}) ===")
                 Log.e("GeminiApi", "Attempt time: ${attemptTime}ms")
-                Log.e("GeminiApi", "Error: ${e.message}")
+                Log.e("GeminiApi", "Error: ${e.printStackTrace()}")
                 Log.e("GeminiApi", "=== END GEMINI API ERROR ===")
                 
                 // Save error log to file if context is provided
