@@ -59,4 +59,13 @@ class Eyes(context: Context) {
     fun getWindowDumpFile(): File {
         return xmlFile
     }
+
+    fun getKeyBoardStatus(): Boolean {
+        val service = ScreenInteractionService.instance
+        if (service == null) {
+            Log.e("AccessibilityController", "Accessibility Service is not running!")
+            return false
+        }
+        return service.isTypingAvailable()
+    }
 }

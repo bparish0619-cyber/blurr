@@ -1,6 +1,7 @@
 package com.example.blurr.api
 
 import android.content.Context
+import com.example.blurr.agent.AgentConfig
 import com.example.blurr.agent.ClickableInfo
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -18,88 +19,8 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 
 class Retina(
-    private val context: Context,
     private val eyes: Eyes,
-    private val apiKey: String
 ) {
-
-    private val client = OkHttpClient.Builder()
-        .callTimeout(30, TimeUnit.SECONDS)
-        .build()
-
-    private val clientWithTimeouts = OkHttpClient.Builder()
-        .connectTimeout(60, TimeUnit.SECONDS) // Connection timeout
-        .readTimeout(60, TimeUnit.SECONDS)    // Read timeout
-        .writeTimeout(60, TimeUnit.SECONDS)   // Write timeout
-        .build()
-    private suspend fun callGeminiApi(bitmap: Bitmap): String? {
-        return try {
-            // Use the generic withRetry function. All retry logic is handled for us.
-            withRetry(times = 3) {
-                val imgHelp = ImageHelper()
-                val base64Image = imgHelp.bitmapToBase64(bitmap)
-                val payload = JSONObject().apply {
-                    put("model", "gemini-2.0-flash")
-                    val contentArray = JSONArray().apply {
-                        put("parts", JSONArray().apply {
-                            put(JSONObject().put("inline_data", JSONObject()
-                                .put("mime_type", "image/png")
-                                .put("data", base64Image)
-                            ))
-                            put(JSONObject().put("text", boundingBoxSystemInstructionsv3))
-                        })
-                    }
-                    put("contents", contentArray)
-                    put("generationConfig", JSONObject().apply { /* ... your schema ... */ })
-                }
-
-                val request = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
-                    .post(payload.toString().toRequestBody("application/json".toMediaType()))
-                    .build()
-
-                clientWithTimeouts.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) throw IOException("Gemini API call failed: ${response.code}")
-                    val resultJson = JSONObject(response.body?.string() ?: "")
-                    resultJson.getJSONArray("candidates").getJSONObject(0)
-                        .getJSONObject("content").getJSONArray("parts")
-                        .getJSONObject(0).getString("text")
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("Retina", "Gemini API failed after all retries.", e)
-            null // Return null if all retries fail
-        }
-    }
-
-    private suspend fun callOcrApi(bitmap: Bitmap): String? {
-        return try {
-            // Use the same generic withRetry function for the OCR call.
-            withRetry(times = 3) {
-                val outputStream = ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-                val imageBytes = outputStream.toByteArray()
-
-                val requestBodyOCR = MultipartBody.Builder()
-                    .setType(MultipartBody.FORM)
-                    .addFormDataPart("image", "screenshot.png", imageBytes.toRequestBody("image/png".toMediaType()))
-                    .build()
-
-                val requestOCR = Request.Builder()
-                    .url("http://10.0.2.2:8000/ocr")
-                    .post(requestBodyOCR)
-                    .build()
-
-                client.newCall(requestOCR).execute().use { responseOCR ->
-                    if (!responseOCR.isSuccessful) throw IOException("OCR API call failed: ${responseOCR.code}")
-                    responseOCR.body?.string() ?: ""
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("Retina", "OCR API failed after all retries.", e)
-            null // Return null if all retries fail
-        }
-    }
 
     private fun extractJsonArray(text: String): List<JSONObject> {
         val regex = Regex("""\[\s*\{.*?\}\s*]""", RegexOption.DOT_MATCHES_ALL)
@@ -115,7 +36,7 @@ class Retina(
         cleanJson = cleanJson.replace(Regex(",\\s*([}\\]])"), "$1")
 
         // Remove dangling commas before closing brackets of arrays
-        cleanJson = cleanJson.replace(Regex(",\\s*\\]"), "]")
+        cleanJson = cleanJson.replace(Regex(",\\s*]"), "]")
 
         // Remove dangling commas before closing brackets of objects
         cleanJson = cleanJson.replace(Regex(",\\s*\\}"), "}")
@@ -163,235 +84,69 @@ class Retina(
         """.trimIndent()
 
     @RequiresApi(Build.VERSION_CODES.R)
-    suspend fun getPerceptionInfos(context: Context?, bitmap: Bitmap): Quadruple<List<ClickableInfo>, Int, Int, Boolean> {
+    suspend fun getPerceptionInfos(context: Context?, bitmap: Bitmap, config: AgentConfig): PerceptionResult {
 
         val width = bitmap.width
         val height = bitmap.height
-        val imgHelp = ImageHelper()
-        val base64Image = imgHelp.bitmapToBase64(bitmap)
-
-// Step 3: Prepare JSON request body with schema
-        val payload = JSONObject().apply {
-            put("model", "gemini-2.0-flash")
-
-            // Contents array
-            val content = JSONObject().apply {
-                put("parts", JSONArray().apply {
-                    put(JSONObject().put("inline_data", JSONObject()
-                        .put("mime_type", "image/png")
-                        .put("data", base64Image)
-                    ))
-                    put(JSONObject().put("text", boundingBoxSystemInstructionsv3))
-                })
-            }
-            put("contents", JSONArray().put(content))
-
-            // Generation config with response schema
-            put("generationConfig", JSONObject().apply {
-                put("responseMimeType", "application/json")
-                put("responseSchema", JSONObject().apply {
-                    put("type", "ARRAY")
-                    put("items", JSONObject().apply {
-                        put("type", "OBJECT")
-                        put("properties", JSONObject().apply {
-                            put("label", JSONObject().put("type", "STRING"))
-                            put("box_2d", JSONObject().apply {
-                                put("type", "ARRAY")
-                                put("items", JSONObject().put("type", "NUMBER"))
-                            })
-                        })
-                        put("propertyOrdering", JSONArray().apply {
-                            put("label")
-                            put("box_2d")
-                        })
-                    })
-                })
-            })
-        }
-
-        // Step 4: Send request to Gemini
-        val responseText = GeminiApi.generateContent(boundingBoxSystemInstructionsv3, listOf(bitmap))
-
-//        val clientWithTimeouts = client.newBuilder()
-//            .connectTimeout(30, TimeUnit.SECONDS)
-//            .readTimeout(60, TimeUnit.SECONDS)
-//            .writeTimeout(60, TimeUnit.SECONDS)
-//            .build()
-//        val maxRetries = 3
-//        var attempt = 0
-//        var lastException: Exception? = null
-//        var responseText: String? = null
-//
-//        while (attempt < maxRetries && responseText == null) {
-//            try {
-//                val request = Request.Builder()
-//                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
-//                    .post(payload.toString().toRequestBody("application/json".toMediaType()))
-//                    .build()
-//
-//                val response = clientWithTimeouts.newCall(request).execute()
-//                response.use {
-//                    if (!response.isSuccessful) {
-//                        throw IOException("Gemini API failed: ${response.code} ${response.message}")
-//                    }
-//
-//                    val resultJson = JSONObject(response.body?.string() ?: "")
-//                    responseText = resultJson
-//                        .getJSONArray("candidates")
-//                        .getJSONObject(0)
-//                        .getJSONObject("content")
-//                        .getJSONArray("parts")
-//                        .getJSONObject(0)
-//                        .getString("text")
-//                }
-//            } catch (e: Exception) {
-//                lastException = e
-//                attempt++
-//                if (attempt < maxRetries) {
-//                    val delay = 1000L * attempt
-//                    println("Gemini request failed (attempt $attempt), retrying in ${delay}ms: ${e.message}")
-//                    Thread.sleep(delay)
-//                }
-//            }
-//        }
-//
-//        if (responseText == null) {
-//            throw lastException ?: Exception("Unknown error in Gemini API call")
-//        }
-
         val clickableInfos = mutableListOf<ClickableInfo>()
-        val sanitizedJson = sanitizeJson(responseText.toString())
-//        println(sanitizedJson)
-
         var keyBoardMap = mutableMapOf<String, Int>()
 
-        val boxes = extractJsonArray(sanitizedJson)
-        boxes.mapNotNull { obj ->
-            try {
-                val box = obj.getJSONArray("box_2d")
-                val label = obj.getString("label")
-                val ymin = box.getDouble(0) / 1000 * height
-                val xmin = box.getDouble(1) / 1000 * width
-                val ymax = box.getDouble(2) / 1000 * height
-                val xmax = box.getDouble(3) / 1000 * width
-                val centerX = ((xmin + xmax) / 2).toInt()
-                val centerY = ((ymin + ymax) / 2).toInt()
-                keyBoardMap[label] = 10
-                clickableInfos.add(ClickableInfo("icon: $label", centerX to centerY))
-            } catch (e: Exception) {
-                null
+        // Only perform visual analysis if NOT in XML mode (i.e., in screenshot mode)
+        if (!config.isXmlMode) {
+            Log.d("Retina", "Performing visual analysis (screenshot mode)")
+            // Step 4: Send request to Gemini
+            val responseText = GeminiApi.generateContent(boundingBoxSystemInstructionsv3, listOf(bitmap))
+            val sanitizedJson = sanitizeJson(responseText.toString())
+
+            val boxes = extractJsonArray(sanitizedJson)
+            boxes.mapNotNull { obj ->
+                try {
+                    val box = obj.getJSONArray("box_2d")
+                    val label = obj.getString("label")
+                    val ymin = box.getDouble(0) / 1000 * height
+                    val xmin = box.getDouble(1) / 1000 * width
+                    val ymax = box.getDouble(2) / 1000 * height
+                    val xmax = box.getDouble(3) / 1000 * width
+                    val centerX = ((xmin + xmax) / 2).toInt()
+                    val centerY = ((ymin + ymax) / 2).toInt()
+                    keyBoardMap[label] = 10
+                    clickableInfos.add(ClickableInfo("icon: $label", centerX to centerY))
+                } catch (e: Exception) {
+                    null
+                }
             }
         }
-//        :race-horse: Completed the integration of the Task Performer
-//
-//        Additional
 
-        // Step 6 Send to FastAPI OCR
-//        val outputStream = ByteArrayOutputStream()
-//        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-//        val imageBytes = outputStream.toByteArray()
-//        val requestBodyOCR = MultipartBody.Builder()
-//            .setType(MultipartBody.FORM)
-//            .addFormDataPart(
-//                "image",
-//                System.currentTimeMillis().toString(),
-//                imageBytes.toRequestBody("image/png".toMediaType())
-//            )
-//            .build()
-//
-//        val requestOCR = Request.Builder()
-//            .url("http://10.0.2.2:8000/ocr")
-//            .post(requestBodyOCR)
-//            .build()
-//
-//        val responseOCR = client.newCall(requestOCR).execute()
-//        if (!responseOCR.isSuccessful) {
-//            throw Exception("OCR API failed: ${responseOCR.code} ${responseOCR.message}")
-//        }
+        val keyboardOpen = eyes.getKeyBoardStatus()
 
-//        val json = JSONObject(responseOCR.body.string())
-//        val results = json.getJSONArray("results")
-
-        // step 7, add parsed stuff too to the info
-//        for (i in 0 until results.length()) {
-//            val obj = results.getJSONObject(i)
-//            val text = obj.getString("text")
-//            val center = obj.getJSONArray("center")
-//            val cx = center.getDouble(0).toInt()
-//            val cy = center.getDouble(1).toInt()
-//            keyBoardMap[text] = 10
-//            clickableInfos.add(ClickableInfo("text: $text", cx to cy))
-//        }
-
-        // if in debug or testing, save the perception and coord in the logs
-        if (context != null) {
-//            logPerceptionInfo(context, clickableInfos)
+        // Handle XML mode if needed
+        var xmlData = ""
+        if (config.isXmlMode) {
+            Log.d("Retina", "Skipping visual analysis, using XML mode only")
+            try {
+                xmlData = eyes.openXMLEyes()
+                Log.d("Retina", "XML data captured for XML mode")
+            } catch (e: Exception) {
+                Log.e("Retina", "Failed to capture XML data", e)
+                xmlData = "<hierarchy error=\"XML capture failed\"/>"
+            }
+        } else {
+            Log.d("Retina", "No visual analysis performed (XML mode)")
         }
 
-        // Check if keyboardMap contains all characters from 'a' to 'z'
-        val keyboardOpen = ('a'..'z').all { char ->
-            keyBoardMap.containsKey(char.toString())
-        }
-
-
-        return Quadruple(clickableInfos, width, height, keyboardOpen)
+        return PerceptionResult(clickableInfos, width, height, keyboardOpen, xmlData)
     }
 }
 
 
 
-data class Quadruple<A, B, C, D>(
-    val first: A,
-    val second: B,
-    val third: C,
-    val fourth: D
+/**
+ * Comprehensive perception result that includes both visual and XML data
+ */
+data class PerceptionResult(
+    val clickableInfos: List<ClickableInfo>,
+    val width: Int,
+    val height: Int,
+    val keyboardOpen: Boolean,
+    val xmlData: String = ""
 )
-
-//
-//    @RequiresApi(Build.VERSION_CODES.R)
-//    suspend fun logPerceptionInfo(context: Context, clickableInfos: List<ClickableInfo>) {
-//        println("Logging perception info")
-//        val eyes = Eyes(context)
-//        eyes.openEyes()
-//        val screenshotFile = eyes.getScreenshotFile()
-//
-//        val bitmap = BitmapFactory.decodeFile(screenshotFile?.absolutePath)
-//            .copy(Bitmap.Config.ARGB_8888, true)
-//
-//        val canvas = Canvas(bitmap)
-//
-//        val circlePaint = Paint().apply {
-//            color = Color.RED
-//            style = Paint.Style.FILL
-//            isAntiAlias = true
-//        }
-//
-//        val textPaint = Paint().apply {
-//            color = Color.BLUE
-//            textSize = 32f
-//            isAntiAlias = true
-//        }
-//
-//        // Draw all ClickableInfo points with text
-//        for ((index, info) in clickableInfos.withIndex()) {
-//            val (label, coord) = info
-//            val (x, y) = coord
-//
-//            // Draw circle
-//            canvas.drawCircle(x.toFloat(), y.toFloat(), 10f, circlePaint)
-//
-//            // Draw label
-//            canvas.drawText(label, x + 12f, y - 12f, textPaint)
-//        }
-//
-//        // Save annotated screenshot
-//        val logDir = File(context.filesDir, "infoPerceptionLogs")
-//        logDir.mkdirs()
-//        val timestamp = System.currentTimeMillis()
-//        val logFile = File(logDir, "perception_$timestamp.jpg")
-//        FileOutputStream(logFile).use { out ->
-//            bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
-//        }
-//        println("Logging of preceptionInfo saved in data/data/com.example.blurr/files/tap_logs/perception_$timestamp.jpg")
-//    }
-//

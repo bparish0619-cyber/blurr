@@ -108,7 +108,7 @@ class AgentTaskService : Service() {
             //NOTE LIMITED RESOURCE, YOUR CAREFULLY, for more info read about Hardware Buffer
             val eyes = Eyes(context)
 
-            val retina = Retina(context, eyes, API_KEY)
+            val retina = Retina(eyes)
             val infoPool = InfoPool()
             val persistent = Persistent()
             val finger = Finger(context)
@@ -215,40 +215,33 @@ class AgentTaskService : Service() {
                 if (iteration == 1 && screenshotFile != null){
                     val perceptionTimeStart = System.currentTimeMillis()
                     val screenshotPath = File(screenshotsDir, "screenshot.jpg")
-//                    screenshotFile.copyTo(screenshotPath, overwrite = true)
-//                    val lastScreenshotFile = screenshotPath // Store for potential removal
-//                    for (i in 0 until 100){
-//                        val (perceptionInfos, width, height, keyboardOn) = retina.getPerceptionInfos(
-//                            context, screenshotFile
-//                        )
-//                        println("Try number $i ")
-//                    }
-                    val (perceptionInfos, width, height, keyboardOn) = retina.getPerceptionInfos(
-                        context, screenshotFile
-                    )
-                    infoPool.width = width
-                    infoPool.height = height
+                    
+                    // Centralized perception handling
+                    val perceptionResult = retina.getPerceptionInfos(context, screenshotFile, config)
+                    
+                    infoPool.width = perceptionResult.width
+                    infoPool.height = perceptionResult.height
+                    infoPool.keyboardPre = perceptionResult.keyboardOpen
+                    infoPool.perceptionInfosPre = perceptionResult.clickableInfos.toMutableList()
+                    
+                    // Set XML data if available
+                    if (config.isXmlMode && perceptionResult.xmlData.isNotEmpty()) {
+                        infoPool.perceptionInfosPreXML = perceptionResult.xmlData
+                        Log.d("AgentTaskService", "XML data captured: ${perceptionResult.xmlData.take(100)}...")
+                    }
+                    
                     appendToFile(
                         taskLog,
                         "{step: $iteration, operation: perception, screenshot: $screenshotPath, perception_infos: ${
-                            perceptionInfos.forEach { (text, coordinates) ->
+                            perceptionResult.clickableInfos.forEach { (text, coordinates) ->
                                 println("Text: $text, Coordinates: $coordinates \n")
                             }
-                        }, duration: ${(System.currentTimeMillis() - perceptionTimeStart) / 1000} seconds}"
+                        }, xml_mode: ${config.isXmlMode}, duration: ${(System.currentTimeMillis() - perceptionTimeStart) / 1000} seconds}"
                     )
-                    infoPool.keyboardPre = keyboardOn
-                    if (config.isXmlMode){
-                        val xml = eyes.openXMLEyes()
-                        println(xml)
-                        infoPool.perceptionInfosPreXML = xml
-                        delay(10000)
+                    
+                    if(perceptionResult.clickableInfos.isEmpty()) {
+                        Log.d("AgentTaskService", "No perception infos found, stopping execution")
                     }
-                    if(perceptionInfos.isEmpty()) {
-//                        println(bitmap)
-                        return
-                    }
-                    infoPool.perceptionInfosPre = perceptionInfos as MutableList<ClickableInfo>
-
                 }
 
 
@@ -431,24 +424,28 @@ class AgentTaskService : Service() {
 //               Step 4 : Take the Perception after the action by operator has been performed
                 if (postScreenshotFile!= null && screenshotFile != null)
                 {
-                    val (postPerceptionInfos, _, _, keyBoardOnPost) = retina.getPerceptionInfos(
+                    val postPerceptionResult = retina.getPerceptionInfos(
                         context,
-                        screenshotFile
+                        postScreenshotFile,
+                        config
                     )
                     val perceptionPostEndTime = System.currentTimeMillis()
                     appendToFile(
                         taskLog,
-                        "{step: $iteration, operation: perception_post, screenshot: NUll, perception_infos: ${
-                            postPerceptionInfos.forEach { (text, coordinates) ->
+                        "{step: $iteration, operation: perception_post, screenshot: post_screenshot, perception_infos: ${
+                            postPerceptionResult.clickableInfos.forEach { (text, coordinates) ->
                                 println("Text: $text, Coordinates: $coordinates \n")
                             }
-                        }, duration: ${(perceptionPostEndTime - perceptionPostStartTime) / 1000} seconds}"
+                        }, xml_mode: ${config.isXmlMode}, duration: ${(perceptionPostEndTime - perceptionPostStartTime) / 1000} seconds}"
                     )
-                    infoPool.perceptionInfosPost = postPerceptionInfos as MutableList<ClickableInfo>
-                    val xmlPost = eyes.openXMLEyes()
-                    println(xmlPost)
-                    infoPool.perceptionInfosPostXML = xmlPost
-                    infoPool.keyboardPost = keyBoardOnPost
+                    infoPool.perceptionInfosPost = postPerceptionResult.clickableInfos.toMutableList()
+                    infoPool.keyboardPost = postPerceptionResult.keyboardOpen
+                    
+                    // Set XML data if available
+                    if (config.isXmlMode && postPerceptionResult.xmlData.isNotEmpty()) {
+                        infoPool.perceptionInfosPostXML = postPerceptionResult.xmlData
+                        Log.d("AgentTaskService", "Post-action XML data captured")
+                    }
                 }
 
 

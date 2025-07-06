@@ -382,6 +382,17 @@ class ScreenInteractionService : AccessibilityService() {
         Log.d("InteractionService", "Accessibility Service destroyed.")
     }
 
+    /**
+     * NEW: Programmatically checks if there is a focused and editable input field
+     * ready to receive text. This is the most reliable way to know if typing is possible.
+     * @return True if typing is possible, false otherwise.
+     */
+    fun isTypingAvailable(): Boolean {
+        val focusedNode = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        // A field is available for typing if it's focused, editable, and enabled.
+        return focusedNode != null && focusedNode.isEditable && focusedNode.isEnabled
+    }
+
     fun clickOnPoint(x: Float, y: Float) {
         // Show visual feedback for the tap if the debug flag is enabled
         if (DEBUG_SHOW_TAPS) {
