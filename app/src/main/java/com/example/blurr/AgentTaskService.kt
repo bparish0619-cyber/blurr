@@ -14,7 +14,6 @@ import com.example.blurr.agent.AgentConfigFactory
 import com.example.blurr.agent.ClickableInfo
 import com.example.blurr.agent.InfoPool
 import com.example.blurr.agent.Manager
-import com.example.blurr.agent.Notetaker
 import com.example.blurr.agent.Operator
 import com.example.blurr.agent.VisionHelper
 import com.example.blurr.agent.atomicActionSignatures
@@ -118,7 +117,6 @@ class AgentTaskService : Service() {
             val actionReflector = ActionReflector()
             val reflectorShortCut = ReflectorShortCut()
             val reflectorTips = ReflectorTips()
-            val noteTaker = Notetaker()
 
             var iteration = 0
 
@@ -273,11 +271,7 @@ class AgentTaskService : Service() {
                     config, 
                     screenshotFile
                 )
-                // Request to Gemini
-//            for (i in 0 until 100){
-//                val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = API_KEY)
-//                println("Try number : $i")
-//            }
+
                 val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = config.apiKey)
                 val parsedManagerPlan = manager.parseResponse(outputPlan.toString())
 
@@ -491,8 +485,7 @@ class AgentTaskService : Service() {
 
                         val actionName = actionObject["name"] // Assuming actionObject is a JSONObject
                         if (atomicActionSignatures.containsKey(actionName)) {
-                            // back(ADB_PATH) // back one step for atomic actions
-                            // No operation needed as per python code 'pass'
+
                         } else if (infoPool.shortcuts.containsKey(actionName)) {
                             if (shortcutErrorMessage != null) {
                                 currentErrorDescription += "; Error occurred while executing the shortcut: $shortcutErrorMessage"
@@ -528,36 +521,6 @@ class AgentTaskService : Service() {
                 Log.d("MainActivity","Outcome: $actionOutcome")
                 Log.d("MainActivity","Progress Status: $progressStatus")
                 Log.d("MainActivity","Error Description: $errorDescription")
-
-                // NoteTaker: Record Important Content
-                if (actionOutcome == "A") {
-                    Log.d("MainActivity", "\n### NoteKeeper ... ###\n")
-                    val noteTakingStartTime = System.currentTimeMillis()
-                    val promptNote = noteTaker.getPrompt(infoPool, config)
-                    var chatNote = noteTaker.initChat()
-                    var combined = VisionHelper.createChatResponse(
-                        "user", 
-                        promptNote, 
-                        chatNote, 
-                        config, 
-                        postScreenshotFile
-                    )
-                    val outputNote = getReasoningModelApiResponse(combined, apiKey = config.apiKey)
-                    val parsedResultNote = noteTaker.parseResponse(outputNote.toString())
-                    val importantNotes = parsedResultNote["important_notes"].toString()
-                    infoPool.importantNotes = importantNotes
-
-                    val noteTakingEndTime = System.currentTimeMillis()
-                    appendToFile(taskLog, "{\n" +
-                            "    \"step\": $iteration,\n" +
-                            "    \"operation\": \"notetaking\",\n" +
-                            "    \"prompt_note\": \"$promptNote\",\n" +
-                            "    \"raw_response\": \"$outputNote\",\n" +
-                            "    \"important_notes\": \"$importantNotes\",\n" +
-                            "    \"duration\": ${(noteTakingEndTime - noteTakingStartTime) / 1000}\n" +
-                            "}")
-                    Log.d("MainActivity", "Important Notes: $importantNotes")
-                }
 
                 screenshotFile = postScreenshotFile
                 infoPool.keyboardPre = infoPool.keyboardPost
