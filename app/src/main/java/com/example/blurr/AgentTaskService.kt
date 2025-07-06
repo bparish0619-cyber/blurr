@@ -9,11 +9,14 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import kotlinx.coroutines.delay
 import com.example.blurr.agent.ActionReflector
+import com.example.blurr.agent.AgentConfig
+import com.example.blurr.agent.AgentConfigFactory
 import com.example.blurr.agent.ClickableInfo
 import com.example.blurr.agent.InfoPool
 import com.example.blurr.agent.Manager
 import com.example.blurr.agent.Notetaker
 import com.example.blurr.agent.Operator
+import com.example.blurr.agent.VisionHelper
 import com.example.blurr.agent.atomicActionSignatures
 import com.example.blurr.agent.shortcut.ReflectorShortCut
 import com.example.blurr.agent.tips.ReflectorTips
@@ -83,6 +86,15 @@ class AgentTaskService : Service() {
             val context = this
             val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
 
+            // Create centralized configuration
+            val config = AgentConfigFactory.create(
+                context = context,
+                visionMode = visionMode,
+                apiKey = API_KEY
+            )
+            
+            // Log vision mode info for debugging
+            VisionHelper.logVisionModeInfo(config)
 
         val shortcutsFile = File(context.filesDir, "shortcuts.json")
             val tipsFile = File(context.filesDir, "tips.txt")
@@ -109,27 +121,23 @@ class AgentTaskService : Service() {
             val noteTaker = Notetaker()
 
             var iteration = 0
-            val maxItr = 200000
-            val maxConsecutiveFailure = 3
-            val maxRepetitiveActions = 3
 
             val taskLog = File(logDir, "taskLog.txt")
 
             infoPool.instruction = inputText
             infoPool.shortcuts = persistent.loadShortcutsFromFile(shortcutsFile)
             infoPool.tips = persistent.loadTipsFromFile(tipsFile)
-            infoPool.errToManagerThresh = 2
+            infoPool.errToManagerThresh = config.errorThreshold
 
             if (infoPool.shortcuts.isEmpty()){
                 infoPool.shortcuts = operator.initShortcuts
             }
 
-            appendToFile(taskLog, "{step: 0, operation: init, instruction: $inputText, maxItr: $maxItr, vision_mode: $visionMode }")
+            appendToFile(taskLog, "{step: 0, operation: init, instruction: $inputText, maxItr: ${config.maxIterations}, vision_mode: ${config.visionMode.displayName} }")
 
         var screenshotFile = eyes.openEyes()
 
         var postScreenshotFile: Bitmap?
-        val xmlMode = visionMode == "XML"
 
         // Implementing Memory in the agent
         val userIdManager = UserIdManager(context)
@@ -145,26 +153,26 @@ class AgentTaskService : Service() {
                 iteration++
 
 //              Iteration LIMIT
-                if (maxItr < iteration) {
-                    Log.e("MainActivity", "Max iteration reached: $maxItr")
-                    appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: max_iteration, maxItr: $maxItr, final_info_pool: $infoPool, task_duration: ${(System.currentTimeMillis() - taskStartTime)/1000} seconds}" )
+                if (config.maxIterations < iteration) {
+                    Log.e("MainActivity", "Max iteration reached: ${config.maxIterations}")
+                    appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: max_iteration, maxItr: ${config.maxIterations}, final_info_pool: $infoPool, task_duration: ${(System.currentTimeMillis() - taskStartTime)/1000} seconds}" )
                     return
                 }
 
 //              Consecutive Failure limit
-                if (infoPool.actionOutcomes.size >= maxConsecutiveFailure) {
-                    val lastKActionOutcomes = infoPool.actionOutcomes.takeLast(maxConsecutiveFailure)
+                if (infoPool.actionOutcomes.size >= config.maxConsecutiveFailures) {
+                    val lastKActionOutcomes = infoPool.actionOutcomes.takeLast(config.maxConsecutiveFailures)
                     val errFlags = lastKActionOutcomes.map { if (it == "B" || it == "C") 1 else 0 }
-                    if (errFlags.sum() == maxConsecutiveFailure) {
+                    if (errFlags.sum() == config.maxConsecutiveFailures) {
                         Log.e("MainActivity", "Consecutive failures reach the limit. Stopping...")
-                        appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: max_consecutive_failures, max_consecutive_failures: $maxConsecutiveFailure, final_info_pool: $infoPool, task_duration: ${(System.currentTimeMillis() - taskStartTime)/1000} seconds}")
+                        appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: max_consecutive_failures, max_consecutive_failures: ${config.maxConsecutiveFailures}, final_info_pool: $infoPool, task_duration: ${(System.currentTimeMillis() - taskStartTime)/1000} seconds}")
                         return
                     }
                 }
 
 //               max repetition allowed
-                if (infoPool.actionHistory.size >= maxRepetitiveActions){
-                    val lastKActions = infoPool.actionHistory.takeLast(maxRepetitiveActions)
+                if (infoPool.actionHistory.size >= config.maxRepetitiveActions){
+                    val lastKActions = infoPool.actionHistory.takeLast(config.maxRepetitiveActions)
                     val lastKActionsSet = mutableSetOf<String>()
                     try {
                         for (actStr in lastKActions) {
@@ -196,7 +204,7 @@ class AgentTaskService : Service() {
                         val repeatedActionKey = lastKActionsSet.first()
                         if (!repeatedActionKey.contains("Swipe") && !repeatedActionKey.contains("Back")) {
                             Log.e("MainActivity", "Repetitive actions reaches the limit. Stopping...")
-                            appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: max_repetitive_actions, max_repetitive_actions: $maxRepetitiveActions, final_info_pool: $infoPool, task_duration: ${(System.currentTimeMillis() - taskStartTime)/1000} seconds}")
+                            appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: max_repetitive_actions, max_repetitive_actions: ${config.maxRepetitiveActions}, final_info_pool: $infoPool, task_duration: ${(System.currentTimeMillis() - taskStartTime)/1000} seconds}")
                             return
                         }
                     }
@@ -229,7 +237,7 @@ class AgentTaskService : Service() {
                         }, duration: ${(System.currentTimeMillis() - perceptionTimeStart) / 1000} seconds}"
                     )
                     infoPool.keyboardPre = keyboardOn
-                    if (xmlMode){
+                    if (config.isXmlMode){
                         val xml = eyes.openXMLEyes()
                         println(xml)
                         infoPool.perceptionInfosPreXML = xml
@@ -263,19 +271,21 @@ class AgentTaskService : Service() {
 
                 // Step 2: Manager Planning
                 val managerPlanningStart = System.currentTimeMillis()
-                val promptPlan = manager.getPrompt(infoPool, xmlMode)
+                val promptPlan = manager.getPrompt(infoPool, config)
                 val chatPlan = manager.initChat()
-                val combinedChatPlan = if (xmlMode) {
-                    addResponse("user", promptPlan, chatPlan)
-                } else {
-                    addResponse("user", promptPlan, chatPlan, screenshotFile)
-                }
+                val combinedChatPlan = VisionHelper.createChatResponse(
+                    "user", 
+                    promptPlan, 
+                    chatPlan, 
+                    config, 
+                    screenshotFile
+                )
                 // Request to Gemini
 //            for (i in 0 until 100){
 //                val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = API_KEY)
 //                println("Try number : $i")
 //            }
-                val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = API_KEY)
+                val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = config.apiKey)
                 val parsedManagerPlan = manager.parseResponse(outputPlan.toString())
 
                 // Updating the InfoPool
@@ -305,10 +315,10 @@ class AgentTaskService : Service() {
                         val experienceReflectionStartTime = System.currentTimeMillis()
 
                         // Shortcuts
-                        val promptKnowledgeShortcuts = reflectorShortCut.getPrompt(infoPool, xmlMode)
+                        val promptKnowledgeShortcuts = reflectorShortCut.getPrompt(infoPool, config)
                         var chatKnowledgeShortcuts = reflectorShortCut.initChat()
                         var combined = addResponse("user", promptKnowledgeShortcuts, chatKnowledgeShortcuts)
-                        val outputKnowledgeShortcuts = getReasoningModelApiResponse(combined, apiKey = API_KEY) // Assuming KNOWLEDGE_REFLECTION_MODEL is similar to other models
+                        val outputKnowledgeShortcuts = getReasoningModelApiResponse(combined, apiKey = config.apiKey) // Assuming KNOWLEDGE_REFLECTION_MODEL is similar to other models
                         val parsedResultKnowledgeShortcuts = reflectorShortCut.parseResponse(
                             outputKnowledgeShortcuts.toString()
                         )
@@ -319,10 +329,10 @@ class AgentTaskService : Service() {
                         Log.d("MainActivity", "New Shortcut: $newShortcutStr")
 
                         // Tips
-                        val promptKnowledgeTips = reflectorTips.getPrompt(infoPool, xmlMode)
+                        val promptKnowledgeTips = reflectorTips.getPrompt(infoPool, config)
                         var chatKnowledgeTips = reflectorTips.initChat()
                         var combinedTips = addResponse("user", promptKnowledgeTips, chatKnowledgeTips)
-                        val outputKnowledgeTips = getReasoningModelApiResponse(combinedTips, apiKey = API_KEY) // Assuming KNOWLEDGE_REFLECTION_MODEL
+                        val outputKnowledgeTips = getReasoningModelApiResponse(combinedTips, apiKey = config.apiKey) // Assuming KNOWLEDGE_REFLECTION_MODEL
                         val parsedResultKnowledgeTips = reflectorTips.parseResponse(
                             outputKnowledgeTips.toString()
                         )
@@ -351,14 +361,16 @@ class AgentTaskService : Service() {
 
                 var actionThinkingTimeStart = System.currentTimeMillis()
                 // Step 3 Operator's turn, he will execute on the plan of manager
-                val actionPrompt = operator.getPrompt(infoPool, xmlMode)
+                val actionPrompt = operator.getPrompt(infoPool, config)
                 val actionChat = operator.initChat()
-                val actionCombinedChat = if (xmlMode) {
-                    addResponse("user", actionPrompt, actionChat)
-                } else {
-                    addResponse("user", actionPrompt, actionChat, screenshotFile)
-                }
-                var actionOutput = getReasoningModelApiResponse(actionCombinedChat, apiKey = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg")
+                val actionCombinedChat = VisionHelper.createChatResponse(
+                    "user", 
+                    actionPrompt, 
+                    actionChat, 
+                    config, 
+                    screenshotFile
+                )
+                var actionOutput = getReasoningModelApiResponse(actionCombinedChat, apiKey = config.apiKey)
                 var parsedAction = operator.parseResponse(actionOutput.toString())
                 var actionThought = parsedAction["thought"]
                 var actionObjStr = parsedAction["action"]
@@ -443,16 +455,19 @@ class AgentTaskService : Service() {
 
 //                Step5 The Reflector of our actions
                 val reflectionStartTime = System.currentTimeMillis()
-                val reflectionPrompt = actionReflector.getPrompt(infoPool, xmlMode)
+                val reflectionPrompt = actionReflector.getPrompt(infoPool, config)
                 val reflectionChat = actionReflector.initChat()
-                val reflectionCombinedChat = if (xmlMode) {
-                    addResponse("user", reflectionPrompt, reflectionChat)
-                } else {
-                    addResponsePrePost("user", reflectionPrompt, reflectionChat, screenshotFile, postScreenshotFile)
-                }
+                val reflectionCombinedChat = VisionHelper.createPrePostChatResponse(
+                    "user", 
+                    reflectionPrompt, 
+                    reflectionChat, 
+                    config, 
+                    screenshotFile, 
+                    postScreenshotFile
+                )
 
                 // Sending to the GEMINI
-                val reflectionLLMOutput = getReasoningModelApiResponse(reflectionCombinedChat, apiKey = API_KEY)
+                val reflectionLLMOutput = getReasoningModelApiResponse(reflectionCombinedChat, apiKey = config.apiKey)
                 val parsedReflection = actionReflector.parseResponse(reflectionLLMOutput.toString())
 
                 val outcome = parsedReflection["outcome"].toString()
@@ -521,14 +536,16 @@ class AgentTaskService : Service() {
                 if (actionOutcome == "A") {
                     Log.d("MainActivity", "\n### NoteKeeper ... ###\n")
                     val noteTakingStartTime = System.currentTimeMillis()
-                    val promptNote = noteTaker.getPrompt(infoPool, xmlMode)
+                    val promptNote = noteTaker.getPrompt(infoPool, config)
                     var chatNote = noteTaker.initChat()
-                    var combined = if (xmlMode) {
-                        addResponse("user", promptNote, chatNote)
-                    } else {
-                        addResponse("user", promptNote, chatNote, postScreenshotFile) // Use the post-action screenshot
-                    }
-                    val outputNote = getReasoningModelApiResponse(combined, apiKey = API_KEY)
+                    var combined = VisionHelper.createChatResponse(
+                        "user", 
+                        promptNote, 
+                        chatNote, 
+                        config, 
+                        postScreenshotFile
+                    )
+                    val outputNote = getReasoningModelApiResponse(combined, apiKey = config.apiKey)
                     val parsedResultNote = noteTaker.parseResponse(outputNote.toString())
                     val importantNotes = parsedResultNote["important_notes"].toString()
                     infoPool.importantNotes = importantNotes

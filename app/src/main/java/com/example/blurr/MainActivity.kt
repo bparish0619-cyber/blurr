@@ -23,6 +23,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.blurr.agent.DeepSearch
+import com.example.blurr.agent.VisionMode
 import com.example.blurr.utilities.TTSManager
 import com.example.blurr.utilities.UserIdManager
 import androidx.core.graphics.toColorInt
@@ -146,7 +147,7 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, "Agent Task Started", Toast.LENGTH_SHORT).show()
 
                     // Determine vision mode based on radio button selection
-                    val visionMode = if (xmlModeRadio.isChecked) "XML" else "SCREENSHOT"
+                    val visionMode = if (xmlModeRadio.isChecked) VisionMode.XML.name else VisionMode.SCREENSHOT.name
                     Log.d("MainActivity", "Selected vision mode: $visionMode")
 
                     val serviceIntent = Intent(this@MainActivity, AgentTaskService::class.java).apply {
@@ -194,9 +195,9 @@ class MainActivity : AppCompatActivity() {
     private fun setupVisionModeListener() {
         visionModeGroup.setOnCheckedChangeListener { _, checkedId ->
             visionModeDescription.text = when (checkedId) {
-                R.id.xmlModeRadio -> getString(R.string.xml_mode_description)
-                R.id.screenshotModeRadio -> getString(R.string.screenshot_mode_description)
-                else -> getString(R.string.xml_mode_description)
+                R.id.xmlModeRadio -> VisionMode.XML.description
+                R.id.screenshotModeRadio -> VisionMode.SCREENSHOT.description
+                else -> VisionMode.XML.description
             }
         }
     }

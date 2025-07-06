@@ -10,7 +10,7 @@ class Notetaker: BaseAgent() {
         return listOf("user" to listOf(TextPart(systemPrompt)))
     }
 
-    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
+    override fun getPrompt(infoPool: InfoPool, config: AgentConfig): String {
         var prompt = "### User Instruction ###\n"
         prompt += "${infoPool.instruction}\n\n"
 
@@ -48,7 +48,7 @@ class Notetaker: BaseAgent() {
         prompt += "Note that this information might not be entirely accurate. "
         prompt += "You should combine it with the screenshot to gain a better understanding.\n\n"
 
-        if (infoPool.perceptionInfosPostXML.isNotEmpty() && xmlMode) {
+        if (infoPool.perceptionInfosPostXML.isNotEmpty() && config.isXmlMode) {
             prompt+=("### Visible Screen Elements ###")
             prompt+=("The following UI elements are currently visible on the screen in XML format:")
             prompt+=(infoPool.perceptionInfosPostXML)

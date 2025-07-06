@@ -1,5 +1,6 @@
 package com.example.blurr.agent.tips
 
+import com.example.blurr.agent.AgentConfig
 import com.example.blurr.agent.BaseAgent
 import com.example.blurr.agent.InfoPool
 import com.google.ai.client.generativeai.type.TextPart
@@ -10,7 +11,7 @@ class ExperienceRetrieverTips : BaseAgent() {
         return listOf("user" to listOf(TextPart(systemPrompt)))
     }
 
-    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
+    override fun getPrompt(infoPool: InfoPool,config: AgentConfig): String {
         var prompt = "### Existing Tips from Past Experience ###\n"
         prompt += "${infoPool.tips}\n\n"
 

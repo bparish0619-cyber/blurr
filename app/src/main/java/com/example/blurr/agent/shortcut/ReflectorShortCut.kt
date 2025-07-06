@@ -1,5 +1,6 @@
 package com.example.blurr.agent.shortcut
 
+import com.example.blurr.agent.AgentConfig
 import com.example.blurr.agent.BaseAgent
 import com.example.blurr.agent.InfoPool
 import com.example.blurr.agent.Operator
@@ -30,7 +31,7 @@ class ReflectorShortCut : BaseAgent() {
 }
 """
 
-    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
+    override fun getPrompt(infoPool: InfoPool, config: AgentConfig): String {
         var prompt = "### Current Task ###\n"
         prompt += "${infoPool.instruction}\n\n"
 

@@ -12,7 +12,7 @@ class Manager : BaseAgent() {
         return listOf("user" to listOf(TextPart(systemPromptv1)))
     }
 
-    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
+    override fun getPrompt(infoPool: InfoPool, config: AgentConfig): String {
         val sb = StringBuilder()
         sb.appendLine("### User Instruction ###")
         sb.appendLine(infoPool.instruction)
@@ -24,7 +24,7 @@ class Manager : BaseAgent() {
             sb.appendLine()
         }
 
-        if (infoPool.perceptionInfosPre.isNotEmpty() && !xmlMode ) {
+        if (infoPool.perceptionInfosPre.isNotEmpty() && !config.isXmlMode ) {
             sb.appendLine("### Visible Screen Elements ###")
             sb.appendLine("The following UI elements are currently visible on the screen:")
             infoPool.perceptionInfosPre.forEach { element ->
@@ -32,7 +32,7 @@ class Manager : BaseAgent() {
             }
             sb.appendLine()
         }
-        if (infoPool.perceptionInfosPreXML.isNotEmpty() && xmlMode) {
+        if (infoPool.perceptionInfosPreXML.isNotEmpty() && config.isXmlMode) {
             sb.appendLine("### Visible Screen Elements ###")
             sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
             sb.appendLine(infoPool.perceptionInfosPreXML)

@@ -1,5 +1,6 @@
 package com.example.blurr.agent.shortcut
 
+import com.example.blurr.agent.AgentConfig
 import com.example.blurr.agent.BaseAgent
 import com.example.blurr.agent.InfoPool
 import com.example.blurr.utilities.JsonExtraction
@@ -11,7 +12,7 @@ class ExperienceRetrieverShortCut : BaseAgent() {
         return listOf("user" to listOf(TextPart(systemPrompt)))
     }
 
-    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
+    override fun getPrompt(infoPool: InfoPool,config: AgentConfig ): String {
         var prompt = "### Existing Shortcuts from Past Experience ###\n"
 
         (infoPool.shortcuts).forEach { (name, shortcut) ->

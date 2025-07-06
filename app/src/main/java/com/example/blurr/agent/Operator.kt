@@ -68,7 +68,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
         return listOf("user" to listOf(TextPart(systemPrompt)))
     }
 
-    override fun getPrompt(infoPool: InfoPool, xmlMode: Boolean): String {
+    override fun getPrompt(infoPool: InfoPool, config: AgentConfig): String {
         val sb = StringBuilder()
         sb.appendLine("### User Instruction ###")
         sb.appendLine(infoPool.instruction)
@@ -105,7 +105,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
             sb.appendLine()
         }
 
-        if (infoPool.perceptionInfosPreXML.isNotEmpty() && xmlMode) {
+        if (infoPool.perceptionInfosPreXML.isNotEmpty() && config.isXmlMode) {
             sb.appendLine("### Visible Screen Elements in XML format ###")
             sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
             sb.appendLine(infoPool.perceptionInfosPreXML)
