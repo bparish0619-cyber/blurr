@@ -17,7 +17,7 @@ import com.example.blurr.agent.Manager
 import com.example.blurr.agent.Operator
 import com.example.blurr.agent.VisionHelper
 import com.example.blurr.agent.atomicActionSignatures
-import com.example.blurr.agent.shortcut.ReflectorShortCut
+
 import com.example.blurr.agent.tips.ReflectorTips
 import com.example.blurr.api.Eyes
 import com.example.blurr.api.Finger
@@ -43,6 +43,7 @@ import java.util.Locale
 class AgentTaskService : Service() {
 
     private var agentJob: Job? = null // To keep track of our coroutine
+    private var xmlLoggingJob: Job? = null // To keep track of XML logging coroutine
 
     companion object {
         const val NOTIFICATION_CHANNEL_ID = "AgentTaskChannel"
@@ -62,18 +63,77 @@ class AgentTaskService : Service() {
 
         Log.d("AgentTaskService", "Starting agent task with input: $inputText, vision mode: $visionMode")
 
-        agentJob = CoroutineScope(Dispatchers.IO).launch {
-            runAgentLogic(inputText, visionMode)
+        // Start XML logging in background
+        // startXmlLogging()
 
-            Log.d("AgentTaskService", "Agent task finished. Stopping service.")
-            stopSelf()
-        }
+
+       agentJob = CoroutineScope(Dispatchers.IO).launch {
+           runAgentLogic(inputText, visionMode)
+
+           Log.d("AgentTaskService", "Agent task finished. Stopping service.")
+           stopSelf()
+       }
 
         return START_NOT_STICKY
     }
 
     fun appendToFile(file: File, content: String) {
         file.appendText(content + "\n")
+    }
+
+    /**
+     * Starts a background task that logs XML data every 5 seconds
+     * This runs independently of the main agent logic
+     */
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun startXmlLogging() {
+        xmlLoggingJob = CoroutineScope(Dispatchers.IO).launch {
+            val eyes = Eyes(this@AgentTaskService)
+            val xmlLogDir = File(filesDir, "xml_logs")
+            xmlLogDir.mkdirs()
+            
+            val timestamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date())
+            val xmlLogFile = File(xmlLogDir, "xml_log_$timestamp.txt")
+            
+            Log.d("AgentTaskService", "Starting XML logging to: ${xmlLogFile.absolutePath}")
+            
+            try {
+                while (true) {
+                    val currentTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()).format(Date())
+                    
+                    try {
+                        val xmlData = eyes.openXMLEyes()
+                        val logEntry = """
+                            === XML LOG ENTRY ===
+                            Timestamp: $currentTime
+                            XML Data:
+                            $xmlData
+                            === END XML LOG ===
+                            
+                        """.trimIndent()
+                        
+                        appendToFile(xmlLogFile, logEntry)
+                        Log.d("AgentTaskService", "XML logged at $logEntry")
+                        
+                    } catch (e: Exception) {
+                        val errorEntry = """
+                            === XML LOG ERROR ===
+                            Timestamp: $currentTime
+                            Error: ${e.message}
+                            === END XML LOG ERROR ===
+                            
+                        """.trimIndent()
+                        
+                        appendToFile(xmlLogFile, errorEntry)
+                        Log.e("AgentTaskService", "Failed to capture XML at $currentTime ", e)
+                    }
+                    
+                    delay(5000) // Wait 5 seconds
+                }
+            } catch (e: Exception) {
+                Log.e("AgentTaskService", "XML logging task failed", e)
+            }
+        }
     }
 
 
@@ -95,7 +155,7 @@ class AgentTaskService : Service() {
             // Log vision mode info for debugging
             VisionHelper.logVisionModeInfo(config)
 
-        val shortcutsFile = File(context.filesDir, "shortcuts.json")
+
             val tipsFile = File(context.filesDir, "tips.txt")
 
 
@@ -115,7 +175,7 @@ class AgentTaskService : Service() {
             val manager = Manager()
             val operator = Operator(finger)
             val actionReflector = ActionReflector()
-            val reflectorShortCut = ReflectorShortCut()
+    
             val reflectorTips = ReflectorTips()
 
             var iteration = 0
@@ -123,13 +183,11 @@ class AgentTaskService : Service() {
             val taskLog = File(logDir, "taskLog.txt")
 
             infoPool.instruction = inputText
-            infoPool.shortcuts = persistent.loadShortcutsFromFile(shortcutsFile)
+    
             infoPool.tips = persistent.loadTipsFromFile(tipsFile)
             infoPool.errToManagerThresh = config.errorThreshold
 
-            if (infoPool.shortcuts.isEmpty()){
-                infoPool.shortcuts = operator.initShortcuts
-            }
+            
 
             appendToFile(taskLog, "{step: 0, operation: init, instruction: $inputText, maxItr: ${config.maxIterations}, vision_mode: ${config.visionMode.displayName} }")
 
@@ -301,19 +359,7 @@ class AgentTaskService : Service() {
                         Log.d("MainActivity", "\n### Experience Reflector ... ###\n")
                         val experienceReflectionStartTime = System.currentTimeMillis()
 
-                        // Shortcuts
-                        val promptKnowledgeShortcuts = reflectorShortCut.getPrompt(infoPool, config)
-                        var chatKnowledgeShortcuts = reflectorShortCut.initChat()
-                        var combined = addResponse("user", promptKnowledgeShortcuts, chatKnowledgeShortcuts)
-                        val outputKnowledgeShortcuts = getReasoningModelApiResponse(combined, apiKey = config.apiKey) // Assuming KNOWLEDGE_REFLECTION_MODEL is similar to other models
-                        val parsedResultKnowledgeShortcuts = reflectorShortCut.parseResponse(
-                            outputKnowledgeShortcuts.toString()
-                        )
-                        val newShortcutStr = parsedResultKnowledgeShortcuts["new_shortcut"].toString()
-                        if (newShortcutStr != "None" && newShortcutStr.isNotEmpty()) {
-                            reflectorShortCut.addNewShortcut(newShortcutStr, infoPool)
-                        }
-                        Log.d("MainActivity", "New Shortcut: $newShortcutStr")
+                        
 
                         // Tips
                         val promptKnowledgeTips = reflectorTips.getPrompt(infoPool, config)
@@ -328,11 +374,10 @@ class AgentTaskService : Service() {
                         Log.d("MainActivity", "Updated Tips: $updatedTips")
 
                         val experienceReflectionEndTime = System.currentTimeMillis()
-                        appendToFile(taskLog, "{step: $iteration, operation: experience_reflection, prompt_knowledge_shortcuts: \"$promptKnowledgeShortcuts\", prompt_knowledge_tips: \"$promptKnowledgeTips\", raw_response_shortcuts: \"$outputKnowledgeShortcuts\", raw_response_tips: \"$outputKnowledgeTips\", new_shortcut: \"$newShortcutStr\", updated_tips: \"$updatedTips\", duration: ${(experienceReflectionEndTime - experienceReflectionStartTime) / 1000} seconds}")
+                        appendToFile(taskLog, "{step: $iteration, operation: experience_reflection, prompt_knowledge_tips: \"$promptKnowledgeTips\", raw_response_tips: \"$outputKnowledgeTips\", updated_tips: \"$updatedTips\", duration: ${(experienceReflectionEndTime - experienceReflectionStartTime) / 1000} seconds}")
 
-                        // Save updated tips and shortcuts
+                        // Save updated tips
                         persistent.saveTipsToFile(tipsFile, infoPool.tips)
-                        persistent.saveShortcutsToFile(shortcutsFile, infoPool.shortcuts)
                     }
                 }
 
@@ -369,7 +414,7 @@ class AgentTaskService : Service() {
 
                 var actionExecTimeStart = System.currentTimeMillis()
 
-                val (actionObject, numOfAtomicAction, shortcutErrorMessage) = operator.execute(
+                val (actionObject, numOfAtomicAction, errorMessage) = operator.execute(
                     actionObjStr.toString(), infoPool, context
                 )
 
@@ -486,10 +531,10 @@ class AgentTaskService : Service() {
                         val actionName = actionObject["name"] // Assuming actionObject is a JSONObject
                         if (atomicActionSignatures.containsKey(actionName)) {
 
-                        } else if (infoPool.shortcuts.containsKey(actionName)) {
-                            if (shortcutErrorMessage != null) {
-                                currentErrorDescription += "; Error occurred while executing the shortcut: $shortcutErrorMessage"
-                            }
+                
+                                            if (errorMessage != null) {
+                    currentErrorDescription += "; Error occurred while executing the action: $errorMessage"
+                }
                         } else {
                             throw IllegalArgumentException("Invalid action name: $actionName")
                         }
@@ -531,8 +576,9 @@ class AgentTaskService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // If the service is destroyed unexpectedly, cancel the coroutine
+        // Cancel all coroutines when service is destroyed
         agentJob?.cancel()
+        xmlLoggingJob?.cancel()
         Log.d("AgentTaskService", "Service destroyed.")
     }
 

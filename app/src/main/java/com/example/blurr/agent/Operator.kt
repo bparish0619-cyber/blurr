@@ -12,7 +12,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.os.Build
 import androidx.annotation.RequiresApi
-import com.example.blurr.agent.Operator.ShortcutStep
+
 import java.io.FileOutputStream
 import kotlin.math.min
 
@@ -47,13 +47,7 @@ val atomicActionSignatures = mapOf(
 //    "Open_App" to AtomicActionSignature(listOf("app_name")) { "If the current screen is Home or App screen, you can use this action to open the app named \\\"app_name\\\" on the visible on the current screen." }
 )
 
-data class Shortcut(
-    val name: String,
-    val arguments: List<String>,
-    val description: String,
-    val precondition: String,
-    val atomicActionSequence: List<ShortcutStep>
-)
+
 
 
 class Operator(private val finger: Finger) : BaseAgent() {
@@ -134,7 +128,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
         }
 
         sb.appendLine("\n---")
-        sb.appendLine("Carefully examine all the information provided above and decide on the next action to perform. If you notice an unsolved error in the previous action, think as a human user and attempt to rectify them. You must choose your action from one of the atomic actions or the shortcuts. The shortcuts are predefined sequences of actions that can be used to speed up the process. Each shortcut has a precondition specifying when it is suitable to use. If you plan to use a shortcut, ensure the current phone state satisfies its precondition first.\n\n")
+        sb.appendLine("Carefully examine all the information provided above and decide on the next action to perform. If you notice an unsolved error in the previous action, think as a human user and attempt to rectify them. You must choose your action from one of the atomic actions listed below.\n\n")
 
         sb.appendLine("#### Atomic Actions ####")
         sb.appendLine("The atomic action functions are listed in the format of `name(arguments): description` as follows:\n")
@@ -145,20 +139,11 @@ class Operator(private val finger: Finger) : BaseAgent() {
         }
 
         if (!infoPool.keyboardPre) {
-            sb.appendLine("NOTE: Unable to type. The keyboard has not been activated. To type, please activate the keyboard by tapping on an input box or using a shortcut, which includes tapping on an input box first.\n")
+            sb.appendLine("NOTE: Unable to type. The keyboard has not been activated. To type, please activate the keyboard by tapping on an input box first.\n")
 
         }
 
-        sb.appendLine("\n#### Shortcuts ####")
-        sb.appendLine("The shortcut functions are listed in the format of `name(arguments): description | Precondition: precondition` as follows:\n")
 
-        (infoPool.shortcuts).forEach { (name, shortcut) ->
-            sb.appendLine("- ${name}(${shortcut.arguments.joinToString()}): ${shortcut.description} | Precondition: ${shortcut.precondition}")
-        }
-
-        if (infoPool.shortcuts.isEmpty()) {
-            sb.appendLine("No shortcuts available.")
-        }
 
         sb.appendLine("### Latest Action History ###\n")
         if (infoPool.actionHistory.isNotEmpty()){
@@ -195,11 +180,10 @@ class Operator(private val finger: Finger) : BaseAgent() {
         sb.appendLine("Provide your output in the following format, which contains three parts:\n")
 
         sb.appendLine("### Thought ###\n")
-        sb.appendLine("Provide a detailed explanation of your rationale for the chosen action. IMPORTANT: If you decide to use a shortcut, first verify that its precondition is met in the current phone state. For example, if the shortcut requires the phone to be at the Home screen, check whether the current screenshot shows the Home screen. If not, perform the appropriate atomic actions instead.\n\n")
+        sb.appendLine("Provide a detailed explanation of your rationale for the chosen action.\n\n")
 
         sb.appendLine("### Action ###\n")
-        sb.appendLine("Choose only one action or shortcut from the options provided. IMPORTANT: Do NOT return invalid actions like null or stop. Do NOT repeat previously failed actions.\n")
-        sb.appendLine("Use shortcuts whenever possible to expedite the process, but make sure that the precondition is met.\n")
+        sb.appendLine("Choose only one action from the atomic actions provided. IMPORTANT: Do NOT return invalid actions like null or stop. Do NOT repeat previously failed actions.\n")
         sb.appendLine("You must provide your decision using a valid JSON format specifying the name and arguments of the action. For example, if you choose to tap at position (100, 200), you should write {\"name\":\"Tap\", \"arguments\":{\"x\":100, \"y\":100}}. If an action does not require arguments, such as Home, fill in null to the \"arguments\" field. Ensure that the argument keys match the action function's signature exactly.\n\n")
 
         sb.appendLine("### Description ###\n")
@@ -249,24 +233,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
         return text.substring(from, to).trim()
     }
 
-    data class ShortcutStep(
-        val name: String,
-        val argumentsMap: Map<String, String>
-    )
 
-    val initShortcuts = mutableMapOf(
-        "Tap_Type_and_Enter" to Shortcut(
-            name = "Tap_Type_and_Enter",
-            arguments = listOf("x", "y", "text"),
-            description = "Tap an input box at (x, y), type the text, then press Enter.",
-            precondition = "Text input box is empty.",
-            atomicActionSequence = listOf(
-                ShortcutStep("Tap", mapOf("x" to "x", "y" to "y")),
-                ShortcutStep("Type", mapOf("text" to "text")),
-                ShortcutStep("Enter", emptyMap())
-            )
-        )
-    )
 
     @RequiresApi(Build.VERSION_CODES.R)
     suspend fun execute(
@@ -301,7 +268,6 @@ class Operator(private val finger: Finger) : BaseAgent() {
 
         val name = (actionObj["name"] as String).trim()
         val arguments = actionObj["arguments"] as Map<*, *>
-        val shortcut = infoPool.shortcuts[name]
 
         // Execute atomic action
         if (atomicActionSignatures.containsKey(name)) {
@@ -324,41 +290,8 @@ class Operator(private val finger: Finger) : BaseAgent() {
                 Thread.sleep(10000)
             } else {
                 executeAtomicAction(name, arguments, context)
-//                logActionOnScreenshot(name, arguments, context)
             }
             return Triple(actionObj, 1, null)
-        }
-        // Execute shortcut (search in both initShortcuts and infoPool)
-        else if (shortcut != null) {
-            println("Executing shortcut: $name")
-            try {
-                shortcut.atomicActionSequence.forEachIndexed { i, atomicAction ->
-                    val atomicActionName = atomicAction.name
-                    val atomicActionArgs = mutableMapOf<String, Any?>()
-
-                    if (atomicAction.argumentsMap.isNotEmpty()) {
-                        atomicAction.argumentsMap.forEach { (atomicArgKey, value) ->
-                            if (arguments.containsKey(value)) { // if the mapped key is in the shortcut arguments
-                                atomicActionArgs[atomicArgKey] = arguments[value]
-                            } else { // if not: the values are directly passed
-                                atomicActionArgs[atomicArgKey] = value
-                            }
-                        }
-                    }
-
-                    println("\t Executing sub-step $i: $atomicActionName $atomicActionArgs ...")
-                    executeAtomicAction(atomicActionName, atomicActionArgs, context)
-
-//                    logActionOnScreenshot(atomicActionName, atomicActionArgs, context)
-//                    val eyes = Eyes(context)
-//                    eyes.openEyes()
-                    Thread.sleep(800)
-                }
-                return Triple(actionObj, shortcut.atomicActionSequence.size, null)
-            } catch (e: Exception) {
-                println("Error in executing shortcut: $name, ${e.message}")
-                return Triple(actionObj, shortcut.atomicActionSequence.indexOfFirst { it.name == e.message?.substringAfterLast(": ")?.substringBefore(" ") }, e.message) // This is a rough way to get the step index
-            }
         }
         else {
             if (name.lowercase() in listOf("null", "none", "finish", "exit", "stop")) {

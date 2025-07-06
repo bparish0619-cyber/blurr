@@ -42,14 +42,7 @@ class Manager : BaseAgent() {
             sb.appendLine("---")
             sb.appendLine("Think step by step and make an high-level plan to achieve the user's instruction. If the request is complex, break it down into subgoals. If the request involves exploration, include concrete subgoals to quantify the investigation steps. The screenshot displays the starting state of the phone.\n\n")
 
-            if (infoPool.shortcuts.isNotEmpty()) {
-                sb.appendLine("### Available Shortcuts from Past Experience ###")
-                sb.appendLine("We additionally provide some shortcut functionalities based on past experience. These shortcuts are predefined sequences of operations that might make the plan more efficient. Each shortcut includes a precondition specifying when it is suitable for use. If your plan implies the use of certain shortcuts, ensure that the precondition is fulfilled before using them. Note that you don't necessarily need to include the names of these shortcuts in your high-level plan; they are provided only as a reference.\n")
-                infoPool.shortcuts.forEach { (name, shortcut) ->
-                    sb.appendLine("- $name: ${shortcut.description} | Precondition: ${shortcut.precondition}")
-                }
-                sb.appendLine()
-            }
+
 
             sb.appendLine("---")
             sb.appendLine("Provide your output in the following format which contains three parts:\n")
@@ -96,13 +89,7 @@ class Manager : BaseAgent() {
             sb.appendLine("Carefully assess the current status to determine if the task has been fully completed. If the user's request involves exploration, ensure you have conducted sufficient investigation. If you are confident that no further actions are required, mark the task as \"Finished\" in your output. If the task is not finished, outline the next steps. If you are stuck with errors, think step by step about whether the overall plan needs to be revised to address the error.\n")
             sb.appendLine("NOTE: If the current situation prevents proceeding with the original plan or requires clarification from the user, make reasonable assumptions and revise the plan accordingly. Act as though you are the user in such cases.\n\n")
 
-            if (infoPool.shortcuts.isNotEmpty()) {
-                sb.appendLine("\n### Available Shortcuts from Past Experience ###\n")
-                sb.appendLine("We additionally provide some shortcut functionalities based on past experience. These shortcuts are predefined sequences of operations that might make the plan more efficient. Each shortcut includes a precondition specifying when it is suitable for use. If your plan implies the use of certain shortcuts, ensure that the precondition is fulfilled before using them. Note that you don't necessarily need to include the names of these shortcuts in your high-level plan; they are provided only as a reference.\n")
-                infoPool.shortcuts.forEach { (name, shortcut) ->
-                    sb.appendLine("- $name: ${shortcut.description} | Precondition: ${shortcut.precondition}")
-                }
-            }
+
 
             sb.appendLine("---\n")
             sb.appendLine("Provide your output in the following format, which contains three parts:\n\n")

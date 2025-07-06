@@ -7,7 +7,6 @@ data class ClickableInfo(
 
 data class InfoPool(
     var instruction: String = "",
-    var shortcuts: MutableMap<String, Shortcut> = mutableMapOf(),
 
     var width: Int = 1080,
     var height: Int = 2340,
