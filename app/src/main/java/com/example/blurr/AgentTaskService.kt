@@ -91,16 +91,16 @@ class AgentTaskService : Service() {
             val eyes = Eyes(this@AgentTaskService)
             val xmlLogDir = File(filesDir, "xml_logs")
             xmlLogDir.mkdirs()
-            
+
             val timestamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date())
             val xmlLogFile = File(xmlLogDir, "xml_log_$timestamp.txt")
-            
+
             Log.d("AgentTaskService", "Starting XML logging to: ${xmlLogFile.absolutePath}")
-            
+
             try {
                 while (true) {
                     val currentTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()).format(Date())
-                    
+
                     try {
                         val xmlData = eyes.openXMLEyes()
                         val logEntry = """
@@ -111,10 +111,10 @@ class AgentTaskService : Service() {
                             === END XML LOG ===
                             
                         """.trimIndent()
-                        
+
                         appendToFile(xmlLogFile, logEntry)
                         Log.d("AgentTaskService", "XML logged at $logEntry")
-                        
+
                     } catch (e: Exception) {
                         val errorEntry = """
                             === XML LOG ERROR ===
@@ -123,11 +123,11 @@ class AgentTaskService : Service() {
                             === END XML LOG ERROR ===
                             
                         """.trimIndent()
-                        
+
                         appendToFile(xmlLogFile, errorEntry)
                         Log.e("AgentTaskService", "Failed to capture XML at $currentTime ", e)
                     }
-                    
+
                     delay(5000) // Wait 5 seconds
                 }
             } catch (e: Exception) {
@@ -135,7 +135,6 @@ class AgentTaskService : Service() {
             }
         }
     }
-
 
     @RequiresApi(Build.VERSION_CODES.R)
     private suspend fun runAgentLogic(inputText: String, visionMode: String) {

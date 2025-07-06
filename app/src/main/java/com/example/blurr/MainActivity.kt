@@ -13,6 +13,7 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import com.example.blurr.api.Finger
 import kotlinx.coroutines.*
+import kotlinx.coroutines.delay
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.LinearGradient
@@ -25,6 +26,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.blurr.agent.DeepSearch
 import com.example.blurr.agent.VisionMode
 import com.example.blurr.utilities.TTSManager
+import com.example.blurr.utilities.STTManager
 import com.example.blurr.utilities.UserIdManager
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
@@ -45,19 +47,22 @@ class MainActivity : AppCompatActivity() {
     private lateinit var xmlModeRadio: RadioButton
     private lateinit var screenshotModeRadio: RadioButton
     private lateinit var visionModeDescription: TextView
+    private lateinit var voiceInputButton: ImageButton
+    private lateinit var voiceStatusText: TextView
 
     private lateinit var ttsManager: TTSManager
+    private lateinit var sttManager: STTManager
     private lateinit var deepSearchAgent: DeepSearch
     private lateinit var userId: String
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
-                Log.i("MainActivity", "Notification permission GRANTED.")
-                Toast.makeText(this, "Notification permission granted!", Toast.LENGTH_SHORT).show()
+                Log.i("MainActivity", "Permission GRANTED.")
+                Toast.makeText(this, "Permission granted!", Toast.LENGTH_SHORT).show()
             } else {
-                Log.w("MainActivity", "Notification permission DENIED.")
-                Toast.makeText(this, "Notification permission denied. The service notification will not be visible.", Toast.LENGTH_LONG).show()
+                Log.w("MainActivity", "Permission DENIED.")
+                Toast.makeText(this, "Permission denied. Some features may not work properly.", Toast.LENGTH_LONG).show()
             }
         }
 
@@ -85,6 +90,8 @@ class MainActivity : AppCompatActivity() {
         xmlModeRadio = findViewById(R.id.xmlModeRadio)
         screenshotModeRadio = findViewById(R.id.screenshotModeRadio)
         visionModeDescription = findViewById(R.id.visionModeDescription)
+        voiceInputButton = findViewById(R.id.voiceInputButton)
+        voiceStatusText = findViewById(R.id.voiceStatusText)
 
         grantPermission.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
@@ -92,9 +99,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         ttsManager = TTSManager(this)
+        sttManager = STTManager(this)
         deepSearchAgent = DeepSearch()
         setupClickListeners()
         setupVisionModeListener()
+        setupVoiceInput()
         handler = Handler(Looper.getMainLooper())
 
 
@@ -202,6 +211,114 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupVoiceInput() {
+        voiceInputButton.setOnTouchListener { _, event ->
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    // Start listening when button is pressed
+                    startVoiceInput()
+                    true
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    // Stop listening when button is released
+                    stopVoiceInput()
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun startVoiceInput() {
+        voiceStatusText.text = getString(R.string.listening)
+        voiceInputButton.isPressed = true
+        
+        sttManager.startListening(
+            onResult = { recognizedText ->
+                runOnUiThread {
+                    voiceStatusText.text = getString(R.string.hold_to_speak)
+                    voiceInputButton.isPressed = false
+                    inputField.setText(recognizedText)
+                    Toast.makeText(this, "Recognized: $recognizedText", Toast.LENGTH_SHORT).show()
+                    
+                    // Automatically perform the task
+                    performTaskFromVoiceInput(recognizedText)
+                }
+            },
+            onError = { errorMessage ->
+                runOnUiThread {
+                    voiceStatusText.text = getString(R.string.hold_to_speak)
+                    voiceInputButton.isPressed = false
+                    Toast.makeText(this, "Error: $errorMessage", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onListeningStateChange = { isListening ->
+                runOnUiThread {
+                    voiceInputButton.isPressed = isListening
+                    voiceStatusText.text = if (isListening) getString(R.string.listening) else getString(R.string.hold_to_speak)
+                }
+            }
+        )
+    }
+
+    private fun performTaskFromVoiceInput(instruction: String) {
+        statusText.text = "Processing voice command..."
+        
+        lifecycleScope.launch {
+            try {
+                // Announce the task being performed
+                val announcement = "I will perform the task: $instruction"
+                ttsManager.speakText(announcement)
+                
+                // Wait a bit for TTS to complete
+                delay(2000)
+                
+                val finalAnswer = deepSearchAgent.execute(instruction)
+                
+                if (instruction == "a") {
+                    ttsManager.speakText("I am ready to win Hundred Agents Hackathon, and start new era of personal agents")
+                    return@launch
+                }
+                
+                if (finalAnswer == "NO-SEARCH") {
+                    Log.d("MainActivity", "This is a UI Task. Starting AgentTaskService.")
+                    statusText.text = "Agent started to perform task..."
+                    
+                    // Announce the agent task
+                    ttsManager.speakText("Starting agent task for: $instruction")
+                    
+                    // Determine vision mode based on radio button selection
+                    val visionMode = if (xmlModeRadio.isChecked) VisionMode.XML.name else VisionMode.SCREENSHOT.name
+                    Log.d("MainActivity", "Selected vision mode: $visionMode")
+
+                    val serviceIntent = Intent(this@MainActivity, AgentTaskService::class.java).apply {
+                        putExtra("TASK_INSTRUCTION", instruction)
+                        putExtra("VISION_MODE", visionMode)
+                    }
+                    startService(serviceIntent)
+                    val fin = Finger(this@MainActivity)
+                    fin.home()
+                } else {
+                    println("Final Answer: $finalAnswer")
+                    Log.d("MainActivity", "Deep Search complete. Answer: $finalAnswer")
+                    statusText.text = finalAnswer
+                    ttsManager.speakText(finalAnswer)
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error processing voice command", e)
+                val errorMessage = "Error processing your command: ${e.message}"
+                statusText.text = errorMessage
+                ttsManager.speakText(errorMessage)
+            }
+        }
+    }
+
+    private fun stopVoiceInput() {
+        sttManager.stopListening()
+        voiceStatusText.text = getString(R.string.hold_to_speak)
+        voiceInputButton.isPressed = false
+    }
+
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         Log.w("AppMemory", "onTrimMemory event received with level: $level")
@@ -220,6 +337,12 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateUI()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        sttManager.shutdown()
+        ttsManager.shutdown()
     }
     private fun isAccessibilityServiceEnabled(): Boolean {
         val service = packageName + "/" + ScreenInteractionService::class.java.canonicalName
@@ -253,6 +376,7 @@ class MainActivity : AppCompatActivity() {
         tvPermissionStatus.setTextColor(if (isPermissionGranted) Color.GREEN else Color.RED)
     }
     private fun askForNotificationPermission() {
+        // Request notification permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             when {
                 ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -267,6 +391,22 @@ class MainActivity : AppCompatActivity() {
                     Log.i("MainActivity", "Requesting notification permission for the first time.")
                     requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
+            }
+        }
+        
+        // Request microphone permission for voice input
+        when {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+                    PackageManager.PERMISSION_GRANTED -> {
+                Log.i("MainActivity", "Microphone permission is already granted.")
+            }
+            shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO) -> {
+                Log.w("MainActivity", "Showing rationale and requesting microphone permission.")
+                requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+            else -> {
+                Log.i("MainActivity", "Requesting microphone permission for the first time.")
+                requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
     }

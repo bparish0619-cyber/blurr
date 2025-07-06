@@ -17,4 +17,13 @@
     <string name="screenshot_mode">Screenshot Mode</string>
     <string name="xml_mode_description">Uses UI structure data (faster, less resource intensive)</string>
     <string name="screenshot_mode_description">Uses actual screenshots (more accurate, higher resource usage)</string>
+    <string name="voice_input">Voice Command</string>
+    <string name="hold_to_speak">Hold to Speak Command</string>
+    <string name="listening">Listening...</string>
+    <string name="speech_error">Speech recognition error</string>
+    <string name="no_speech_detected">No speech detected</string>
+    <string name="speech_permission_required">Microphone permission required for voice input</string>
+    <string name="processing_voice_command">Processing voice command...</string>
+    <string name="performing_task">I will perform the task: %s</string>
+    <string name="starting_agent_task">Starting agent task for: %s</string>
 </resources>
