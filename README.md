@@ -92,3 +92,9 @@ https://github.com/user-attachments/assets/b577072e-2f7f-42d2-9054-3a11160cf87d
 
 Write you api key in in local.properties, more keys you use, better is the speed 😉
 
+
+# Pull latest log file
+adb pull /data/data/com.example.blurr/files/gemini_logs/
+
+# View logs in real-time
+adb logcat | grep GeminiApi

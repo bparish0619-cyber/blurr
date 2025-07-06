@@ -33,7 +33,7 @@ object GeminiApi {
     suspend fun generateContent(
         prompt: String,
         images: List<Bitmap> = emptyList(),
-        modelName: String = "gemini-2.0-flash",
+        modelName: String = "gemini-2.5-flash",
         maxRetry: Int = 4,
         context: Context? = null
     ): String? {
@@ -96,6 +96,22 @@ object GeminiApi {
                     Log.d("GeminiApi", "Parsed response preview: ${parsedResponse?.take(200)}${if ((parsedResponse?.length ?: 0) > 200) "..." else ""}")
                     Log.d("GeminiApi", "=== END GEMINI API CALL ===")
                     
+                    // Save detailed log to file if context is provided
+                    context?.let { ctx ->
+                        val logEntry = createLogEntry(
+                            attempts + 1,
+                            modelName,
+                            prompt,
+                            images.size,
+                            payload.toString(),
+                            response.code,
+                            responseBody,
+                            totalTime,
+                            attemptTime
+                        )
+                        saveLogToFile(ctx, logEntry)
+                    }
+                    
                     return parsedResponse
                 }
             } catch (e: Exception) {
@@ -106,6 +122,23 @@ object GeminiApi {
                 Log.e("GeminiApi", "Attempt time: ${attemptTime}ms")
                 Log.e("GeminiApi", "Error: ${e.message}")
                 Log.e("GeminiApi", "=== END GEMINI API ERROR ===")
+                
+                // Save error log to file if context is provided
+                context?.let { ctx ->
+                    val logEntry = createLogEntry(
+                        attempts + 1,
+                        modelName,
+                        prompt,
+                        images.size,
+                        "",
+                        500,
+                        "",
+                        0,
+                        attemptTime,
+                        e.message
+                    )
+                    saveLogToFile(ctx, logEntry)
+                }
                 
                 attempts++
                 if (attempts < maxRetry) {
@@ -176,6 +209,38 @@ object GeminiApi {
             Log.d("GeminiApi", "Log saved to: ${logFile.absolutePath}")
         } catch (e: Exception) {
             Log.e("GeminiApi", "Failed to save log to file", e)
+        }
+    }
+
+    /**
+     * Gets the path to the latest log file for easy access
+     */
+    fun getLatestLogFilePath(context: Context): String? {
+        try {
+            val logDir = File(context.filesDir, "gemini_logs")
+            if (!logDir.exists()) return null
+            
+            val logFiles = logDir.listFiles { file -> file.name.startsWith("gemini_debug_") }
+            return logFiles?.maxByOrNull { it.lastModified() }?.absolutePath
+        } catch (e: Exception) {
+            Log.e("GeminiApi", "Failed to get latest log file path", e)
+            return null
+        }
+    }
+
+    /**
+     * Reads the content of the latest log file
+     */
+    fun getLatestLogContent(context: Context): String? {
+        try {
+            val logPath = getLatestLogFilePath(context)
+            if (logPath == null) return null
+            
+            val logFile = File(logPath)
+            return logFile.readText()
+        } catch (e: Exception) {
+            Log.e("GeminiApi", "Failed to read latest log file", e)
+            return null
         }
     }
 

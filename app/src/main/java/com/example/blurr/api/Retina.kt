@@ -1,6 +1,6 @@
 package com.example.blurr.api
 
-
+import android.content.Context
 import com.example.blurr.agent.AgentConfig
 import com.example.blurr.agent.ClickableInfo
 import org.json.JSONArray
@@ -76,7 +76,7 @@ class Retina(
         """.trimIndent()
 
     @RequiresApi(Build.VERSION_CODES.R)
-    suspend fun getPerceptionInfos(bitmap: Bitmap, config: AgentConfig): PerceptionResult {
+    suspend fun getPerceptionInfos(context: Context?, bitmap: Bitmap, config: AgentConfig): PerceptionResult {
 
         val width = bitmap.width
         val height = bitmap.height
@@ -86,7 +86,7 @@ class Retina(
         if (!config.isXmlMode) {
             Log.d("Retina", "Performing visual analysis (screenshot mode)")
             // Step 4: Send request to Gemini
-            val responseText = GeminiApi.generateContent(boundingBoxSystemInstructionsv3, listOf(bitmap))
+            val responseText = GeminiApi.generateContent(boundingBoxSystemInstructionsv3, listOf(bitmap), context = context)
             val sanitizedJson = sanitizeJson(responseText.toString())
 
             val boxes = extractJsonArray(sanitizedJson)

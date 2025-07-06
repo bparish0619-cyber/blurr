@@ -6,18 +6,21 @@ class ActionReflector : BaseAgent() {
 
     override fun initChat(): List<Pair<String, List<TextPart>>> {
         val systemPrompt = """
-            You are a helpful AI assistant for operating mobile phones. Your goal is to verify whether the last action produced the expected behavior and to keep track of the overall progress.
+            You are an intelligent AI agent responsible for analyzing the results of mobile device actions and determining their success or failure.
+            
+            Your core responsibilities:
+            1. Compare the before and after states of the device screen
+            2. Determine if the action achieved its intended outcome
+            3. Update progress status for successful actions
+            4. Provide detailed error analysis for failed actions
+            
+            Analysis approach:
+            - For XML mode: Focus on structural changes in UI hierarchy, element properties, and navigation state
+            - For Screenshot mode: Focus on visual changes, text content, button states, and screen transitions
+            
+            Be thorough but concise in your analysis. Consider the context of the user's overall goal when evaluating success.
         """.trimIndent()
-        val systemPromptv2 = """
-        You are an intelligent agent responsible for verifying whether the last action taken on a mobile device achieved its intended outcome.
         
-        Your responsibilities include:
-        - Comparing visual and textual changes before and after the action.
-        - Judging whether the result matches the user's intention.
-        - Updating the progress status or explaining failure cases.
-        
-        Use common sense and screen context to determine success or failure.
-    """.trimIndent()
         return listOf("user" to listOf(TextPart(systemPrompt)))
     }
 
@@ -29,11 +32,7 @@ class ActionReflector : BaseAgent() {
         sb.appendLine()
 
         sb.appendLine("### Progress Status ###")
-        sb.appendLine(infoPool.progressStatus)
-
-        if(infoPool.progressStatus.isEmpty()) {
-            sb.appendLine("No progress yet.")
-        }
+        sb.appendLine(infoPool.progressStatus.ifEmpty { "No progress yet." })
         sb.appendLine()
 
         sb.appendLine("### Current Subgoal ###")
@@ -42,71 +41,119 @@ class ActionReflector : BaseAgent() {
 
         sb.appendLine("---")
 
-        sb.appendLine("The attached two images are two phone screenshots before and after your last action. ")
-        sb.appendLine("The width and height are {info_pool.width} and {info_pool.height} pixels, respectively.\n")
+        // Vision mode specific instructions
+        if (config.isXmlMode) {
+            sb.appendLine("You are analyzing UI changes using XML structure data. Focus on structural changes in the UI hierarchy.")
+            sb.appendLine("Screen dimensions: ${infoPool.width} x ${infoPool.height} pixels")
+            sb.appendLine()
+        } else {
+            sb.appendLine("You are analyzing visual changes using screenshots. Focus on visual and textual changes.")
+            sb.appendLine("Screen dimensions: ${infoPool.width} x ${infoPool.height} pixels")
+            sb.appendLine()
+        }
 
-        sb.appendLine("To help you better perceive the content in these screenshots, we have extracted positional information for the text elements and icons. ")
-        sb.appendLine("The format is: ( content: coordinates). The coordinates are [x, y], where x represents the horizontal pixel position (from left to right) ")
-        sb.appendLine("and y represents the vertical pixel position (from top to bottom).\n")
-
-        sb.appendLine("Note that these information might not be entirely accurate. ")
-        sb.appendLine("You should combine them with the screenshots to gain a better understanding.")
-        sb.appendLine("\n\n")
-
-
-
+        // Screen Information Before Action
         sb.appendLine("### Screen Information Before the Action ###")
-        infoPool.perceptionInfosPre.forEach {
-            if (it.text.isNotBlank() && it.coordinates != Pair(0, 0)) {
-                sb.appendLine("${it.text}; ${it.coordinates}")
+        if (config.isXmlMode) {
+            if (infoPool.perceptionInfosPreXML.isNotEmpty()) {
+                sb.appendLine("### UI Structure (XML) ###")
+                sb.appendLine("The following UI elements were visible on the screen in XML format:")
+                sb.appendLine(infoPool.perceptionInfosPreXML)
+                sb.appendLine()
+            } else {
+                sb.appendLine("No XML data available for pre-action state.")
+            }
+        } else {
+            if (infoPool.perceptionInfosPre.isNotEmpty()) {
+                sb.appendLine("### Extracted UI Elements ###")
+                sb.appendLine("The following UI elements were detected (format: element_text; coordinates):")
+                infoPool.perceptionInfosPre.forEach {
+                    if (it.text.isNotBlank() && it.coordinates != Pair(0, 0)) {
+                        sb.appendLine("${it.text}; ${it.coordinates}")
+                    }
+                }
+                sb.appendLine()
+            } else {
+                sb.appendLine("No visual elements detected in pre-action screenshot.")
             }
         }
-        sb.appendLine("Keyboard status before the action: ${if (infoPool.keyboardPre) "The keyboard has been activated and you can type." else "The keyboard has not been activated and you can\\'t type."}\n")
-        if (infoPool.perceptionInfosPreXML.isNotEmpty() && config.isXmlMode) {
-            sb.appendLine("### Visible Screen Elements in XML Form ###")
-            sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
-            sb.appendLine(infoPool.perceptionInfosPreXML)
-            sb.appendLine()
-        }
-        sb.appendLine("\n\n")
-
-        sb.appendLine("### Screen Information After the Action ###")
-        infoPool.perceptionInfosPost.forEach {
-            if (it.text.isNotBlank() && it.coordinates != Pair(0, 0)) {
-                sb.appendLine("${it.text}; ${it.coordinates}")
-            }
-        }
-        if (infoPool.perceptionInfosPostXML.isNotEmpty() && config.isXmlMode) {
-            sb.appendLine("### Visible Screen Elements in XML Form ###")
-            sb.appendLine("The following UI elements are currently visible on the screen in XML format:")
-            sb.appendLine(infoPool.perceptionInfosPreXML)
-            sb.appendLine()
-        }
-        sb.appendLine("Keyboard status before the action: ${if (infoPool.keyboardPost) "The keyboard has been activated and you can type." else "The keyboard has not been activated and you can\\'t type."}\n")
-        sb.appendLine("\n\n")
-
-
-        sb.appendLine("---")
-        sb.appendLine("### Latest Action ###")
-        sb.appendLine("Action: ${infoPool.lastAction}")
-        sb.appendLine("Expectation: ${infoPool.lastSummary}")
+        
+        sb.appendLine("Keyboard status before action: ${if (infoPool.keyboardPre) "Active - typing enabled" else "Inactive - typing disabled"}")
         sb.appendLine()
 
+        // Screen Information After Action
+        sb.appendLine("### Screen Information After the Action ###")
+        if (config.isXmlMode) {
+            if (infoPool.perceptionInfosPostXML.isNotEmpty()) {
+                sb.appendLine("### UI Structure (XML) ###")
+                sb.appendLine("The following UI elements are now visible on the screen in XML format:")
+                sb.appendLine(infoPool.perceptionInfosPostXML)
+                sb.appendLine()
+            } else {
+                sb.appendLine("No XML data available for post-action state.")
+            }
+        } else {
+            if (infoPool.perceptionInfosPost.isNotEmpty()) {
+                sb.appendLine("### Extracted UI Elements ###")
+                sb.appendLine("The following UI elements are now detected (format: element_text; coordinates):")
+                infoPool.perceptionInfosPost.forEach {
+                    if (it.text.isNotBlank() && it.coordinates != Pair(0, 0)) {
+                        sb.appendLine("${it.text}; ${it.coordinates}")
+                    }
+                }
+                sb.appendLine()
+            } else {
+                sb.appendLine("No visual elements detected in post-action screenshot.")
+            }
+        }
+        
+        sb.appendLine("Keyboard status after action: ${if (infoPool.keyboardPost) "Active - typing enabled" else "Inactive - typing disabled"}")
+        sb.appendLine()
+
+        // Action Details
         sb.appendLine("---")
-        sb.appendLine("Carefully examine the information provided above to determine whether the last action produced the expected behavior. If the action was successful, update the progress status accordingly. If the action failed, identify the failure mode and provide reasoning on the potential reason causing this failure. Note that for the 'Swipe' action, it may take multiple attempts to display the expected content. Thus, for a 'Swipe' action, if the screen shows new content, it usually meets the expectation.")
-        sb.appendLine("\n")
+        sb.appendLine("### Latest Action ###")
+        sb.appendLine("Action performed: ${infoPool.lastAction}")
+        sb.appendLine("Expected outcome: ${infoPool.lastSummary}")
+        sb.appendLine()
 
+        // Analysis Instructions
+        sb.appendLine("---")
+        sb.appendLine("Carefully analyze the changes between the before and after states to determine if the action was successful.")
+        sb.appendLine()
+        
+        if (config.isXmlMode) {
+            sb.appendLine("Focus on structural changes in the UI hierarchy, new elements, removed elements, or changes in element properties.")
+        } else {
+            sb.appendLine("Focus on visual changes, new text elements, button states, navigation changes, or content updates.")
+        }
+        
+        sb.appendLine()
+        sb.appendLine("Special considerations:")
+        sb.appendLine("- For 'Swipe' actions: New content appearing usually indicates success")
+        sb.appendLine("- For 'Tap' actions: UI state changes or navigation typically indicate success")
+        sb.appendLine("- For 'Type' actions: Text input or form completion indicates success")
+        sb.appendLine("- For 'Back' actions: Returning to previous screen indicates success")
+        sb.appendLine()
+        
+        // Add mode-specific analysis hints
+        sb.appendLine(getModeSpecificHints(config))
+        sb.appendLine()
 
-        sb.appendLine("Provide your output in the following format containing three parts:\n")
+        // Output Format
+        sb.appendLine("Provide your analysis in the following format:")
+        sb.appendLine()
         sb.appendLine("### Outcome ###")
-        sb.appendLine("Choose from the following options. Give your answer as \\\"A\\\", \\\"B\\\" or \\\"C\\\":\\n\"")
-        sb.appendLine("A: Successful or Partially Successful. The result of the last action meets the expectation.\\n")
-        sb.appendLine("B: Failed. The last action results in a wrong page. I need to return to the previous state.\\n")
-        sb.appendLine("C: Failed. The last action produces no changes.\\n\\n")
+        sb.appendLine("Choose from the following options. Give your answer as \"A\", \"B\" or \"C\":")
+        sb.appendLine("A: Successful or Partially Successful. The result of the last action meets the expectation.")
+        sb.appendLine("B: Failed. The last action results in a wrong page. I need to return to the previous state.")
+        sb.appendLine("C: Failed. The last action produces no changes.")
+        sb.appendLine()
         sb.appendLine("### Error Description ###")
-        sb.appendLine("If the action failed, provide a detailed description of the error and the potential reason causing this failure. If the action succeeded, put \\\"None\\\" here.\\n\\n")
+        sb.appendLine("If the action failed, provide a detailed description of the error and the potential reason causing this failure. If the action succeeded, put \"None\" here.")
+        sb.appendLine()
         sb.appendLine("### Progress Status ###")
-        sb.appendLine("If the action was successful or partially successful, update the progress status. If the action failed, copy the previous progress status")
+        sb.appendLine("If the action was successful or partially successful, update the progress status. If the action failed, copy the previous progress status.")
 
         return sb.toString()
     }
@@ -122,11 +169,39 @@ class ActionReflector : BaseAgent() {
         )
     }
 
+    /**
+     * Extracts a section from the response text between specified markers
+     */
     private fun extractSection(text: String, start: String, end: String?): String {
         val startIndex = text.indexOf(start)
         if (startIndex == -1) return ""
         val from = startIndex + start.length
         val to = end?.let { text.indexOf(it, from) } ?: text.length
         return text.substring(from, to).trim()
+    }
+
+    /**
+     * Provides mode-specific analysis hints
+     */
+    fun getModeSpecificHints(config: AgentConfig): String {
+        return when (config.visionMode) {
+            VisionMode.XML -> """
+                XML Mode Analysis Hints:
+                - Look for changes in element hierarchy (new nodes, removed nodes)
+                - Check for changes in element properties (enabled/disabled, visible/hidden)
+                - Focus on navigation state changes (activity changes, fragment changes)
+                - Pay attention to text content changes in text elements
+                - Consider changes in element IDs or resource IDs
+            """.trimIndent()
+            
+            VisionMode.SCREENSHOT -> """
+                Screenshot Mode Analysis Hints:
+                - Look for visual changes in UI elements
+                - Check for new text content or removed text
+                - Focus on button state changes (enabled/disabled, pressed/released)
+                - Pay attention to navigation indicators (back buttons, titles)
+                - Consider changes in screen layout or content positioning
+            """.trimIndent()
+        }
     }
 }
