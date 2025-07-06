@@ -48,18 +48,6 @@ class Eyes(context: Context) {
         return service.dumpWindowHierarchy()
     }
 
-    /**
-     * Returns the File object of the most recently captured screenshot.
-     * Returns null if no screenshot has been taken yet.
-     */
-    fun getScreenshotFile(): File? {
-        return latestScreenshotFile
-    }
-
-    fun getWindowDumpFile(): File {
-        return xmlFile
-    }
-
     fun getKeyBoardStatus(): Boolean {
         val service = ScreenInteractionService.instance
         if (service == null) {

@@ -180,7 +180,10 @@ class Operator(private val finger: Finger) : BaseAgent() {
                 sb.appendLine(actionLogString)
                 actionLogStrs.add(actionLogString)
             }
-            if (latestOutcomes.last() == "C" && "Tap" in actionLogStrs[actionLogStrs.size - 1] && "Tap" in actionLogStrs[actionLogStrs.size - 2]) {
+            if (latestOutcomes.last() == "C" &&
+                actionLogStrs.size >= 2 &&
+                "Tap" in actionLogStrs.last() && // .last() is a safer way to get the last element
+                "Tap" in actionLogStrs[actionLogStrs.size - 2]) {
                 sb.appendLine(" \nHINT: If multiple Tap actions failed to make changes to the screen, consider using a \\\"Swipe\\\" action to view more content or use another way to achieve the current subgoal.\n")
             }
         }
@@ -237,50 +240,6 @@ class Operator(private val finger: Finger) : BaseAgent() {
 
         if (name.lowercase() != "wait") Thread.sleep(3000)
     }
-//
-//    fun logActionOnScreenshot(action: String, args: Map<*, *>, context: Context) {
-//
-//        val eyes = Eyes(context)
-//        val screenshotFile = eyes.getScreenshotFile()
-//
-//        val bitmap = BitmapFactory.decodeFile(screenshotFile?.absolutePath)
-//            .copy(Bitmap.Config.ARGB_8888, true)
-//
-//        val canvas = Canvas(bitmap)
-//        val paint = Paint().apply {
-//            color = Color.RED
-//            style = Paint.Style.FILL
-//            textSize = 40f
-//        }
-//
-//        when (action.lowercase()) {
-//            "tap" -> {
-//                val x = (args["x"] as? Number)?.toInt() ?: return
-//                val y = (args["y"] as? Number)?.toInt() ?: return
-//                canvas.drawCircle(x.toFloat(), y.toFloat(), 30f, paint)
-//                canvas.drawText("TAP", x + 35f, y.toFloat(), paint)
-//            }
-//            "swipe" -> {
-//                val x1 = (args["x1"] as? Number)?.toFloat() ?: return
-//                val y1 = (args["y1"] as? Number)?.toFloat() ?: return
-//                val x2 = (args["x2"] as? Number)?.toFloat() ?: return
-//                val y2 = (args["y2"] as? Number)?.toFloat() ?: return
-//                paint.strokeWidth = 8f
-//                canvas.drawLine(x1, y1, x2, y2, paint)
-//                canvas.drawText("SWIPE", x1 + 10f, y1 - 10f, paint)
-//            }
-//            else -> return
-//        }
-//        val logDir = File(context.filesDir, "actionLogs")
-//        logDir.mkdirs()
-//        val timestamp = System.currentTimeMillis()
-//        val logFile = File(logDir, "action_$timestamp.jpg")
-//        FileOutputStream(logFile).use { out ->
-//            bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
-//        }
-//        println("Logging of actionInfo saved in data/data/com.example.blurr/files/actionLogs/action_$timestamp.jpg")
-//
-//    }
 
     private fun extractSection(text: String, start: String, end: String?): String {
         val startIndex = text.indexOf(start)
@@ -289,7 +248,6 @@ class Operator(private val finger: Finger) : BaseAgent() {
         val to = end?.let { text.indexOf(it, from) } ?: text.length
         return text.substring(from, to).trim()
     }
-
 
     data class ShortcutStep(
         val name: String,

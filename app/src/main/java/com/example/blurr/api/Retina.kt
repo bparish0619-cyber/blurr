@@ -1,22 +1,14 @@
 package com.example.blurr.api
 
-import android.content.Context
+
 import com.example.blurr.agent.AgentConfig
 import com.example.blurr.agent.ClickableInfo
-import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 import android.graphics.Bitmap
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import com.example.blurr.utilities.ImageHelper
-import com.example.blurr.utilities.withRetry
-import java.io.ByteArrayOutputStream
-import java.io.IOException
 
 class Retina(
     private val eyes: Eyes,
@@ -84,12 +76,11 @@ class Retina(
         """.trimIndent()
 
     @RequiresApi(Build.VERSION_CODES.R)
-    suspend fun getPerceptionInfos(context: Context?, bitmap: Bitmap, config: AgentConfig): PerceptionResult {
+    suspend fun getPerceptionInfos(bitmap: Bitmap, config: AgentConfig): PerceptionResult {
 
         val width = bitmap.width
         val height = bitmap.height
         val clickableInfos = mutableListOf<ClickableInfo>()
-        var keyBoardMap = mutableMapOf<String, Int>()
 
         // Only perform visual analysis if NOT in XML mode (i.e., in screenshot mode)
         if (!config.isXmlMode) {
@@ -109,7 +100,6 @@ class Retina(
                     val xmax = box.getDouble(3) / 1000 * width
                     val centerX = ((xmin + xmax) / 2).toInt()
                     val centerY = ((ymin + ymax) / 2).toInt()
-                    keyBoardMap[label] = 10
                     clickableInfos.add(ClickableInfo("icon: $label", centerX to centerY))
                 } catch (e: Exception) {
                     null

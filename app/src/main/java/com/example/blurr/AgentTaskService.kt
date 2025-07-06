@@ -217,7 +217,7 @@ class AgentTaskService : Service() {
                     val screenshotPath = File(screenshotsDir, "screenshot.jpg")
                     
                     // Centralized perception handling
-                    val perceptionResult = retina.getPerceptionInfos(context, screenshotFile, config)
+                    val perceptionResult = retina.getPerceptionInfos(screenshotFile, config)
                     
                     infoPool.width = perceptionResult.width
                     infoPool.height = perceptionResult.height
@@ -425,7 +425,6 @@ class AgentTaskService : Service() {
                 if (postScreenshotFile!= null && screenshotFile != null)
                 {
                     val postPerceptionResult = retina.getPerceptionInfos(
-                        context,
                         postScreenshotFile,
                         config
                     )

@@ -1,5 +1,6 @@
 package com.example.blurr.api
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.util.Base64
 import android.util.Log
@@ -11,6 +12,10 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileWriter
+import java.text.SimpleDateFormat
+import java.util.*
 import java.util.concurrent.TimeUnit
 
 /**
@@ -29,45 +34,86 @@ object GeminiApi {
         prompt: String,
         images: List<Bitmap> = emptyList(),
         modelName: String = "gemini-2.0-flash",
-        maxRetry: Int = 4
+        maxRetry: Int = 4,
+        context: Context? = null
     ): String? {
         // Get a new key for this specific request.
         val currentApiKey = ApiKeyManager.getNextKey()
-        Log.d("GeminiApi", "Using API key ending in: ...${currentApiKey}")
+        Log.d("GeminiApi", "Using API key ending in: ...${currentApiKey.takeLast(4)}")
 
         var attempts = 0
         while (attempts < maxRetry) {
+            val attemptStartTime = System.currentTimeMillis()
             try {
-                val payload = buildPayload(prompt, images) // Removed modelName from here
+                val payload = buildPayload(prompt, images)
+                
+                // Log the request details
+                Log.d("GeminiApi", "=== GEMINI API REQUEST (Attempt ${attempts + 1}) ===")
+                Log.d("GeminiApi", "Model: $modelName")
+                Log.d("GeminiApi", "Images count: ${images.size}")
+                Log.d("GeminiApi", "Prompt length: ${prompt.length} characters")
+                Log.d("GeminiApi", "Prompt preview: ${prompt.take(200)}${if (prompt.length > 200) "..." else ""}")
+                
+                // Log full payload for debugging (be careful with sensitive data)
+                Log.d("GeminiApi", "Full payload: ${payload.toString()}")
 
                 val request = Request.Builder()
-                    // Use the key fetched for this attempt
                     .url("https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$currentApiKey")
                     .post(payload.toString().toRequestBody("application/json".toMediaType()))
                     .build()
 
+                val requestStartTime = System.currentTimeMillis()
                 client.newCall(request).execute().use { response ->
-                    // ... (The rest of the function is EXACTLY the same)
+                    val responseEndTime = System.currentTimeMillis()
+                    val totalTime = responseEndTime - requestStartTime
+                    val attemptTime = responseEndTime - attemptStartTime
+                    
                     val responseBody = response.body?.string()
+                    
+                    // Log response details
+                    Log.d("GeminiApi", "=== GEMINI API RESPONSE (Attempt ${attempts + 1}) ===")
+                    Log.d("GeminiApi", "HTTP Status: ${response.code}")
+                    Log.d("GeminiApi", "Response time: ${totalTime}ms")
+                    Log.d("GeminiApi", "Total attempt time: ${attemptTime}ms")
+                    Log.d("GeminiApi", "Response body length: ${responseBody?.length ?: 0} characters")
+                    
                     if (!response.isSuccessful) {
                         Log.e("GeminiApi", "API call failed with HTTP ${response.code} using key ...${currentApiKey.takeLast(4)}")
-                        Log.e("GeminiApi", "Response: $responseBody")
+                        Log.e("GeminiApi", "Error response: $responseBody")
                         throw Exception("API Error ${response.code}")
                     }
 
                     if (responseBody.isNullOrEmpty()) {
+                        Log.e("GeminiApi", "Received empty response body from API.")
                         throw Exception("Received empty response body from API.")
                     }
 
-                    return parseSuccessResponse(responseBody)
+                    // Log successful response
+                    Log.d("GeminiApi", "Response preview: ${responseBody.take(500)}${if (responseBody.length > 500) "..." else ""}")
+                    
+                    val parsedResponse = parseSuccessResponse(responseBody)
+                    Log.d("GeminiApi", "Parsed response length: ${parsedResponse?.length ?: 0} characters")
+                    Log.d("GeminiApi", "Parsed response preview: ${parsedResponse?.take(200)}${if ((parsedResponse?.length ?: 0) > 200) "..." else ""}")
+                    Log.d("GeminiApi", "=== END GEMINI API CALL ===")
+                    
+                    return parsedResponse
                 }
             } catch (e: Exception) {
-                Log.e("GeminiApi", "Attempt ${attempts + 1} failed.", e)
+                val attemptEndTime = System.currentTimeMillis()
+                val attemptTime = attemptEndTime - attemptStartTime
+                
+                Log.e("GeminiApi", "=== GEMINI API ERROR (Attempt ${attempts + 1}) ===")
+                Log.e("GeminiApi", "Attempt time: ${attemptTime}ms")
+                Log.e("GeminiApi", "Error: ${e.message}")
+                Log.e("GeminiApi", "=== END GEMINI API ERROR ===")
+                
                 attempts++
                 if (attempts < maxRetry) {
-                    delay(1000L * attempts)
+                    val delayTime = 1000L * attempts
+                    Log.d("GeminiApi", "Retrying in ${delayTime}ms...")
+                    delay(delayTime)
                 } else {
-                    Log.e("GeminiApi", "Request failed after all retries.")
+                    Log.e("GeminiApi", "Request failed after all ${maxRetry} retries.")
                     return null
                 }
             }
@@ -108,5 +154,64 @@ object GeminiApi {
             .getJSONArray("parts")
             .getJSONObject(0)
             .getString("text")
+    }
+
+    /**
+     * Saves detailed Gemini API logs to a file for persistent debugging
+     */
+    fun saveLogToFile(context: Context, logEntry: String) {
+        try {
+            val logDir = File(context.filesDir, "gemini_logs")
+            if (!logDir.exists()) {
+                logDir.mkdirs()
+            }
+            
+            val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
+            val logFile = File(logDir, "gemini_debug_${timestamp}.log")
+            
+            FileWriter(logFile, true).use { writer ->
+                writer.append("${SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()).format(Date())} - $logEntry\n")
+            }
+            
+            Log.d("GeminiApi", "Log saved to: ${logFile.absolutePath}")
+        } catch (e: Exception) {
+            Log.e("GeminiApi", "Failed to save log to file", e)
+        }
+    }
+
+    /**
+     * Creates a comprehensive log entry for debugging
+     */
+    private fun createLogEntry(
+        attempt: Int,
+        modelName: String,
+        prompt: String,
+        imagesCount: Int,
+        payload: String,
+        responseCode: Int?,
+        responseBody: String?,
+        responseTime: Long,
+        totalTime: Long,
+        error: String? = null
+    ): String {
+        return buildString {
+            appendLine("=== GEMINI API DEBUG LOG ===")
+            appendLine("Timestamp: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()).format(Date())}")
+            appendLine("Attempt: $attempt")
+            appendLine("Model: $modelName")
+            appendLine("Images count: $imagesCount")
+            appendLine("Prompt length: ${prompt.length}")
+            appendLine("Prompt: $prompt")
+            appendLine("Payload: $payload")
+            appendLine("Response code: $responseCode")
+            appendLine("Response time: ${responseTime}ms")
+            appendLine("Total time: ${totalTime}ms")
+            if (error != null) {
+                appendLine("Error: $error")
+            } else {
+                appendLine("Response body: $responseBody")
+            }
+            appendLine("=== END LOG ===")
+        }
     }
 }
