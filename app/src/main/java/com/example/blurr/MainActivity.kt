@@ -116,7 +116,8 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        ttsManager = TTSManager(this)
+        ttsManager = TTSManager.getInstance(this)
+
         sttManager = STTManager(this)
         deepSearchAgent = DeepSearch()
         clarificationAgent = ClarificationAgent()
@@ -141,7 +142,7 @@ class MainActivity : AppCompatActivity() {
             Shader.TileMode.CLAMP
         )
         karanTextView.paint.shader = textShader
-
+        checkAndRequestOverlayPermission()
         val githubLink = findViewById<TextView>(R.id.github_link_textview)
         githubLink.setOnClickListener {
             val url = "https://github.com/Ayush0Chaudhary/blurr"
@@ -357,31 +358,32 @@ class MainActivity : AppCompatActivity() {
                     ttsManager.speakText("I am ready to win Hundred Agents Hackathon, and start new era of personal agents")
                     return@launch
                 }
-                
-                if (finalAnswer == "NO-SEARCH") {
-                    Log.d("MainActivity", "This is a UI Task. Starting AgentTaskService.")
-                    statusText.text = "Agent started to perform task..."
-                    
-                    // Announce the agent task
-                    ttsManager.speakText("Starting agent task for: $instruction")
-                    
-                    // Determine vision mode based on radio button selection
-                    val visionMode = if (xmlModeRadio.isChecked) VisionMode.XML.name else VisionMode.SCREENSHOT.name
-                    Log.d("MainActivity", "Selected vision mode: $visionMode")
+                //TODO Removing the tavily deepsearch agent as it is bad at searching, sorry but it is. Plan to replace tavily, so leaving the code
 
-                    val serviceIntent = Intent(this@MainActivity, AgentTaskService::class.java).apply {
-                        putExtra("TASK_INSTRUCTION", instruction)
-                        putExtra("VISION_MODE", visionMode)
-                    }
-                    startService(serviceIntent)
-                    val fin = Finger(this@MainActivity)
-                    fin.home()
-                } else {
+                // if (finalAnswer == "NO-SEARCH") {
+                     Log.d("MainActivity", "This is a UI Task. Starting AgentTaskService.")
+                     statusText.text = "Agent started to perform task..."
+
+                     // Announce the agent task
+                     ttsManager.speakText("Starting agent task for: $instruction")
+
+                     // Determine vision mode based on radio button selection
+                     val visionMode = if (xmlModeRadio.isChecked) VisionMode.XML.name else VisionMode.SCREENSHOT.name
+                     Log.d("MainActivity", "Selected vision mode: $visionMode")
+
+                     val serviceIntent = Intent(this@MainActivity, AgentTaskService::class.java).apply {
+                         putExtra("TASK_INSTRUCTION", instruction)
+                         putExtra("VISION_MODE", visionMode)
+                     }
+                     startService(serviceIntent)
+                     val fin = Finger(this@MainActivity)
+                     fin.home()
+                // } else {
                     println("Final Answer: $finalAnswer")
                     Log.d("MainActivity", "Deep Search complete. Answer: $finalAnswer")
                     statusText.text = finalAnswer
                     ttsManager.speakText(finalAnswer)
-                }
+                // }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error executing task", e)
                 val errorMessage = "Error executing task: ${e.message}"
@@ -486,6 +488,18 @@ class MainActivity : AppCompatActivity() {
                 Log.i("MainActivity", "Requesting microphone permission for the first time.")
                 requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
+        }
+    }
+    private fun checkAndRequestOverlayPermission() {
+        // Check if we already have the permission
+        if (!Settings.canDrawOverlays(this)) {
+            // If not, create an intent to ask the user to grant it
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            // Start the activity that will show the permission screen
+            startActivity(intent)
         }
     }
 }

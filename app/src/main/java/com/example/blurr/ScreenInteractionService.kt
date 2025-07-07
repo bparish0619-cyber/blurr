@@ -2,6 +2,7 @@ package com.example.blurr
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Path
@@ -16,6 +17,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.util.Xml
+import android.view.Choreographer
 import android.view.Display
 import android.view.Gravity
 import android.view.View
@@ -26,6 +28,8 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
+import com.example.blurr.utilities.TTSManager
+import com.example.blurr.utilities.TtsVisualizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -56,10 +60,40 @@ class ScreenInteractionService : AccessibilityService() {
         var instance: ScreenInteractionService? = null
         const val ACTION_SCREENSHOT_TAKEN = "com.example.accessiblity_service_test.SCREENSHOT_TAKEN"
         // A flag to easily toggle the debug taps on or off
-        const val DEBUG_SHOW_TAPS = true
+        const val DEBUG_SHOW_TAPS = false
         // A flag to easily toggle the debug bounding boxes on or off
-        const val DEBUG_SHOW_BOUNDING_BOXES = true
+        const val DEBUG_SHOW_BOUNDING_BOXES = false
     }
+
+    // Add these properties to your service/activity class
+    private var rotationSpeedAnimator: ValueAnimator? = null
+    private var currentRotationSpeedFactor: Float = 0f // Will be animated between 0.0f and 1.0f
+    private val MAX_ROTATION_SPEED = 2.5f // Adjust this value to make the max rotation faster or slower
+    private val ANIMATION_DURATION_MS = 1500L // 1.5 seconds for acceleration/deceleration
+
+    private var windowManager: WindowManager? = null
+
+    private var ttsVisualizer: TtsVisualizer? = null
+
+    private var audioWaveView: AudioWaveView? = null
+    private var glowingBorderView: GlowBorderView? = null
+
+
+
+    // RENAME rotationSpeedAnimator to masterAnimator for clarity
+    private var masterAnimator: ValueAnimator? = null
+    // NEW: Animator to handle speed transitions
+    private var speedAnimator: ValueAnimator? = null
+
+    // We will animate this value between the speeds defined below
+    private var currentRotationSpeed = 0f
+    private var currentRotationAngle = 0f
+
+    // --- DEFINE YOUR SPEEDS HERE ---
+    private  val BASE_SPEED = 60.0f  // Slow speed when idle
+    private  val FAST_SPEED = 10.0f  // Fast speed when speaking
+    private  val SPEED_TRANSITION_DURATION_MS = 1500L // How long it takes to speed up/down
+
 
     private val executor = Executors.newSingleThreadExecutor()
     private var statusBarHeight = -1
@@ -68,8 +102,165 @@ class ScreenInteractionService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        this.windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         Log.d("InteractionService", "Accessibility Service connected.")
+        setupGlowEffect()
+//        setupAudioWaveEffect()
+//        setupWaveBorderEffect()
     }
+
+
+// In ScreenInteractionService.kt
+
+// REPLACE your existing 'setupGlowEffect' with this new version
+    /**
+     * Shows the border, starts the animation engine at base speed,
+     * and sets up a listener to change speed when TTS is active.
+     */
+    private fun setupGlowEffect() {
+        // 1. Show the border on screen
+        showGlowingBorder()
+
+        // 2. Start the animation engine
+        initializeRotationEngine()
+
+        // 3. Set the initial speed to the slow, base speed
+        setSpeed(BASE_SPEED)
+
+        // 4. Get the TTS manager instance
+        val ttsManager = TTSManager.getInstance(this)
+
+        val mainHandler = Handler(Looper.getMainLooper())
+
+// ...
+
+        ttsManager.utteranceListener = { isSpeaking ->
+            // Post the logic to the main thread
+            mainHandler.post {
+                if (isSpeaking) {
+                    Log.d("GlowEffect", "TTS Speaking: Setting FAST_SPEED")
+                    setSpeed(FAST_SPEED)
+                } else {
+                    Log.d("GlowEffect", "TTS Stopped: Setting BASE_SPEED")
+                    setSpeed(BASE_SPEED)
+                }
+            }
+        }
+    }
+
+    /**
+     * Smoothly animates the rotation speed to a new target value.
+     * @param targetSpeed The speed to transition to (e.g., BASE_SPEED or FAST_SPEED).
+     */
+    private fun setSpeed(targetSpeed: Float) {
+        speedAnimator?.cancel() // Cancel any ongoing speed change
+        speedAnimator = ValueAnimator.ofFloat(currentRotationSpeed, targetSpeed).apply {
+            duration = SPEED_TRANSITION_DURATION_MS
+            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+            addUpdateListener { animator ->
+                // This updates the speed value on every frame of the transition
+                currentRotationSpeed = animator.animatedValue as Float
+            }
+            start()
+        }
+    }
+    /**
+     * NEW: Creates and displays the glowing border overlay.
+     */
+    private fun showGlowingBorder() {
+        if (!Settings.canDrawOverlays(this)) {
+            Log.w("InteractionService", "Cannot show glowing border: 'Draw over other apps' permission not granted.")
+            return
+        }
+        if (glowingBorderView != null) return // Avoid adding multiple views
+
+        glowingBorderView = GlowBorderView(this)
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, // Use accessibility overlay
+            // Flags to make the overlay non-interactive (lets touches pass through)
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        )
+        // UI operations must be on the main thread
+        Handler(Looper.getMainLooper()).post {
+            windowManager?.addView(glowingBorderView, params)
+            Log.d("InteractionService", "Glowing border added.")
+        }
+    }
+
+    /**
+     * NEW: Animates the glow based on voice amplitude.
+     * @param amplitude Normalized voice volume (0.0f to 1.0f).
+     */
+    /**
+     * Animates the glow based on voice amplitude and animated rotation speed.
+     * @param amplitude Normalized voice volume (0.0f to 1.0f).
+     */
+    private fun updateGlowAnimation(amplitude: Float) {
+        glowingBorderView?.let { view ->
+            // 1. Alpha pulsing based on volume (this logic remains the same)
+            val targetAlpha = (80 + 175 * amplitude).toInt()
+            view.setGlowAlpha(targetAlpha)
+
+            // 2. Rotation based on the smoothly animated speed factor
+            // The rotation amount is now driven by our ValueAnimator, not the amplitude
+            val rotationAmount = currentRotationSpeedFactor * MAX_ROTATION_SPEED
+            currentRotationAngle = (currentRotationAngle + rotationAmount) % 360
+            view.setRotation(currentRotationAngle)
+        }
+    }
+
+    /**
+     * Starts the master animation loop. This loop runs forever and uses the
+     * 'currentRotationSpeed' variable to update the border's angle.
+     */
+    private fun initializeRotationEngine() {
+        masterAnimator?.cancel()
+        masterAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
+            duration = 10000L // Duration doesn't matter much, it's just a continuous ticker
+            interpolator = android.view.animation.LinearInterpolator()
+            repeatCount = ValueAnimator.INFINITE
+
+            addUpdateListener {
+                // This is the core engine, running on every frame
+                currentRotationAngle = (currentRotationAngle + currentRotationSpeed) % 360
+                glowingBorderView?.setRotation(currentRotationAngle)
+            }
+            start()
+        }
+    }
+//    /**
+//     * NEW: Sets up the voice detector and starts the glow effect.
+//     */
+//    private fun setupGlowEffect() {
+//        showGlowingBorder()
+//        updateGlowAnimation(100.0f)
+//
+////        // Initialize and start the voice detector
+////        voiceDetector = VoiceAmplitudeDetector(this) { amplitude ->
+////            // This lambda is called frequently with the latest voice amplitude.
+////            // Post the UI update to the main thread.
+////            Handler(Looper.getMainLooper()).post {
+////                updateGlowAnimation(amplitude)
+////            }
+////        }
+////        voiceDetector?.start()
+//    }
+
+    /**
+     * NEW: Hides and cleans up the glowing border view.
+     */
+    private fun hideGlowingBorder() {
+        Handler(Looper.getMainLooper()).post {
+            glowingBorderView?.let { windowManager?.removeView(it) }
+            glowingBorderView = null
+        }
+    }
+
 
     /**
      * Shows a temporary visual indicator on the screen for debugging taps.
@@ -379,6 +570,7 @@ class ScreenInteractionService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         instance = null
+        hideGlowingBorder()
         Log.d("InteractionService", "Accessibility Service destroyed.")
     }
 
@@ -619,6 +811,86 @@ class ScreenInteractionService : AccessibilityService() {
             findInteractableNodesRecursive(node.getChild(i), list)
         }
     }
+
+
+    // Rename the update method to be more descriptive
+
+    /**
+     * NEW: Creates and displays the AudioWaveView at the bottom of the screen.
+     */
+    private fun showAudioWave() {
+        if (audioWaveView != null) return // Already showing
+
+        audioWaveView = AudioWaveView(this)
+
+        // Convert 150dp to pixels for the view's height
+        val heightInDp = 150
+        val heightInPixels = (heightInDp * resources.displayMetrics.density).toInt()
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT, // Full width
+            heightInPixels, // Fixed height
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            // --- 3. Anchor the view to the bottom ---
+            gravity = Gravity.BOTTOM
+        }
+
+        Handler(Looper.getMainLooper()).post {
+            windowManager?.addView(audioWaveView, params)
+            Log.d("InteractionService", "Audio wave view added.")
+        }
+    }
+
+    /**
+     * NEW: Hides the wave view.
+     */
+    private fun hideAudioWave() {
+        Handler(Looper.getMainLooper()).post {
+            audioWaveView?.let { windowManager?.removeView(it) }
+            audioWaveView = null
+        }
+    }
+
+    /**
+     * UPDATED: Connects the TTS visualizer to our new wave view.
+     */
+    private fun setupAudioWaveEffect() {
+        showAudioWave()
+
+        val ttsManager = TTSManager.getInstance(this)
+        if (ttsManager == null) {
+            Log.e("InteractionService", "TTSManager not available.")
+            return
+        }
+
+        ttsVisualizer = TtsVisualizer(ttsManager.audioSessionId) { amplitude ->
+            // This is now simpler, just pass the amplitude.
+            updateWaveAnimation(amplitude)
+        }
+
+        ttsManager.utteranceListener = { isSpeaking ->
+            if (isSpeaking) {
+                ttsVisualizer?.start()
+            } else {
+                ttsVisualizer?.stop()
+            }
+        }
+    }
+
+    /**
+     * UPDATED: Updates the wave animation with the latest audio amplitude.
+     */
+    private fun updateWaveAnimation(amplitude: Float) {
+        // The view handles all the drawing logic internally
+        audioWaveView?.setAmplitude(amplitude)
+    }
+
+
 
 }
 

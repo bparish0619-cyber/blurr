@@ -139,7 +139,7 @@ class AgentTaskService : Service() {
     @RequiresApi(Build.VERSION_CODES.R)
     private suspend fun runAgentLogic(inputText: String, visionMode: String) {
             delay(2000)
-        val tts = TTSManager(this)
+        val tts = TTSManager.getInstance(this)
         val taskStartTime = System.currentTimeMillis()
             val context = this
             val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
