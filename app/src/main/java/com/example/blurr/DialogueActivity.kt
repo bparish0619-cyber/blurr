@@ -52,7 +52,7 @@ class DialogueActivity : AppCompatActivity() {
         cancelButton = findViewById(R.id.cancelButton)
 
         // Initialize managers
-        ttsManager = TTSManager(this)
+        ttsManager = TTSManager.getInstance(this)
         sttManager = STTManager(this)
 
         // Get data from intent

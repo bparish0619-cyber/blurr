@@ -52,7 +52,7 @@ class ContentModerationService : Service() {
         handler = Handler(Looper.getMainLooper())
 
         // Initialize objects once when the service is created
-        ttsManager = TTSManager(this)
+        ttsManager = TTSManager.getInstance(this)
         finger = Finger(this)
         eyes = Eyes(this)
 
