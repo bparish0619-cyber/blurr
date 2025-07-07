@@ -126,6 +126,9 @@ class DialogueActivity : AppCompatActivity() {
         voiceStatusText.text = getString(R.string.listening)
         voiceInputButton.isPressed = true
         
+        // Show a toast to indicate automatic voice activation
+        Toast.makeText(this, "Listening for your answer...", Toast.LENGTH_SHORT).show()
+        
         sttManager.startListening(
             onResult = { recognizedText ->
                 runOnUiThread {
@@ -146,6 +149,12 @@ class DialogueActivity : AppCompatActivity() {
                     voiceStatusText.text = getString(R.string.hold_to_speak)
                     voiceInputButton.isPressed = false
                     Toast.makeText(this, "Error: $errorMessage", Toast.LENGTH_SHORT).show()
+                    
+                    // If there was an error, restart voice input after a delay
+                    lifecycleScope.launch {
+                        delay(2000)
+                        startVoiceInput()
+                    }
                 }
             },
             onListeningStateChange = { isListening ->
@@ -175,6 +184,12 @@ class DialogueActivity : AppCompatActivity() {
             // Speak the question
             lifecycleScope.launch {
                 ttsManager.speakText(question)
+                
+                // Wait for TTS to complete, then start voice input automatically
+                delay(1000) // Wait 1 second after question is displayed
+                runOnUiThread {
+                    startVoiceInput()
+                }
             }
             
             updateProgress()
