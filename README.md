@@ -4,7 +4,11 @@
 
 ---
 
-![Panda AI Home Screen](https://github.com/user-attachments/assets/9ef3993c-9719-448e-a968-d6889373a677) 
+Demo-> Text My Brother Happy Birthday
+
+https://github.com/user-attachments/assets/bac5726a-64b3-4cbf-b116-0ebc369bcec0
+
+
 
 
 **Panda** is a proactive, on-device AI agent for Android that autonomously understands natural language commands and operates your phone's UI to achieve them. Inspired by the need to make modern technology more accessible, Panda acts as your personal operator, capable of handling complex, multi-step tasks across different applications.
