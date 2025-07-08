@@ -15,11 +15,10 @@ class AudioWaveView @JvmOverloads constructor(
 ) : View(context, attrs) {
 
     // --- Configuration Constants to Tune the Look ---
-    private val waveCount = 7 // Increased number of waves
-    private val minIdleAmplitude = 0.05f // The small, constant wave when silent
-    private val maxWaveHeightScale = 0.4f // Reduced max height relative to view (e.g., 40%)
+    private val waveCount = 7
+    private val minIdleAmplitude = 0.15f
+    private val maxWaveHeightScale = 0.25f
 
-    // New color palette with shades of blue, purple, and pink
     private val waveColors = intArrayOf(
         "#8A2BE2".toColorInt(), // BlueViolet
         "#4169E1".toColorInt(), // RoyalBlue
@@ -31,81 +30,107 @@ class AudioWaveView @JvmOverloads constructor(
     )
     // --- End of Configuration ---
 
+    // --- Add these new properties ---
+    private var amplitudeAnimator: ValueAnimator? = null
+    private val amplitudeTransitionDuration = 500L // Duration for the smooth transition in milliseconds
+    // ---
+
     private val wavePaints = mutableListOf<Paint>()
     private val wavePaths = mutableListOf<Path>()
     private val waveFrequencies: FloatArray
     private val wavePhaseShifts: FloatArray
-    private val waveStrokeWidths: FloatArray
 
-    private var phase = 0f
-    private var audioAmplitude = minIdleAmplitude // Start with the idle amplitude
+    // --- NEW: Added properties for more randomness ---
+    private val waveSpeeds: FloatArray
+    private val waveAmplitudeMultipliers: FloatArray
+    // --- End of New Properties ---
+
+    private var audioAmplitude = minIdleAmplitude
 
     init {
         setLayerType(LAYER_TYPE_SOFTWARE, null)
 
-        // Initialize arrays for dynamic properties
+        // Initialize all property arrays
         waveFrequencies = FloatArray(waveCount)
         wavePhaseShifts = FloatArray(waveCount)
-        waveStrokeWidths = FloatArray(waveCount)
+        waveSpeeds = FloatArray(waveCount)
+        waveAmplitudeMultipliers = FloatArray(waveCount)
 
         for (i in 0 until waveCount) {
-            // Generate random properties for each wave to make them unique and non-overlapping
-            waveFrequencies[i] = Random.nextFloat() * 0.6f + 0.8f // Random frequency
-            wavePhaseShifts[i] = Random.nextFloat() * (Math.PI * 2).toFloat() // Random phase shift
-            waveStrokeWidths[i] = Random.nextFloat() * 5f + 2f // Random stroke width
+            // Assign unique random properties to each wave
+            waveFrequencies[i] = Random.nextFloat() * 0.6f + 0.8f // Unique wave shape
+            wavePhaseShifts[i] = Random.nextFloat() * (Math.PI * 2).toFloat() // Unique starting position
+            waveSpeeds[i] = Random.nextFloat() * 0.02f + 0.01f // Unique horizontal speed
+            waveAmplitudeMultipliers[i] = Random.nextFloat() * 0.5f + 0.8f // Unique height multiplier (80% to 130%)
 
             wavePaints.add(Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                strokeWidth = waveStrokeWidths[i]
-                color = waveColors[i % waveColors.size] // Cycle through our beautiful colors
-                maskFilter = BlurMaskFilter(15f, BlurMaskFilter.Blur.NORMAL)
+                style = Paint.Style.FILL
+                color = waveColors[i % waveColors.size]
+                alpha = 100
+
             })
             wavePaths.add(Path())
         }
 
-        // Create a continuous animation loop to move the waves horizontally
-        ValueAnimator.ofFloat(0f, (Math.PI * 2).toFloat()).apply {
+        // The animator now acts as a "ticker" to drive the animation frames.
+        ValueAnimator.ofFloat(0f, 1f).apply { // The values don't matter, just the callback.
             interpolator = LinearInterpolator()
-            duration = 3000 // Slow down the horizontal movement for a more elegant feel
+            duration = 5000 // A long duration for a smooth continuous loop
             repeatCount = ValueAnimator.INFINITE
             addUpdateListener {
-                phase = it.animatedValue as Float
-                invalidate() // Redraw the view on every animation frame
+                // --- CHANGE #2: UPDATE EACH WAVE'S PHASE INDEPENDENTLY ---
+                for (i in 0 until waveCount) {
+                    // Increment each wave's horizontal position by its unique speed
+                    wavePhaseShifts[i] = (wavePhaseShifts[i] + waveSpeeds[i])
+                }
+                invalidate() // Redraw the view on every frame
+                // --- END OF CHANGE #2 ---
             }
             start()
         }
     }
 
+    // --- REPLACE the old setAmplitude function with this new one ---
     /**
-     * This public method allows the service to update the wave's height based on TTS audio.
+     * Smoothly animates the wave's amplitude to a new target level.
+     * @param target The target amplitude level (0.0f for idle, 1.0f for full).
      */
-    fun setAmplitude(newAmplitude: Float) {
-        // This formula ensures a minimum idle wave and scales the max height
-        this.audioAmplitude = minIdleAmplitude + (newAmplitude * maxWaveHeightScale)
-    }
+    fun setTargetAmplitude(target: Float) {
+        val targetAmplitude = minIdleAmplitude + (target * maxWaveHeightScale)
 
+        // Cancel any previous animation and start a new one
+        amplitudeAnimator?.cancel()
+        amplitudeAnimator = ValueAnimator.ofFloat(audioAmplitude, targetAmplitude).apply {
+            duration = amplitudeTransitionDuration
+            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+            addUpdateListener { animation ->
+                // This gets called on every frame of the animation, updating the height smoothly
+                audioAmplitude = animation.animatedValue as Float
+            }
+            start()
+        }
+    }
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        // Draw each of the waves
         for (i in 0 until waveCount) {
             wavePaths[i].reset()
             wavePaths[i].moveTo(0f, height.toFloat())
 
-            // The maximum height the wave can reach, now controlled by the new amplitude logic
-            val maxWaveHeight = height * audioAmplitude
+            // --- CHANGE #3: USE THE UNIQUE AMPLITUDE MULTIPLIER ---
+            // Calculate the max height for this specific wave
+            val waveMaxHeight = height * audioAmplitude * waveAmplitudeMultipliers[i]
+            // --- END OF CHANGE #3 ---
 
             for (x in 0..width step 5) {
-                // The core sine wave calculation using the wave's unique properties
-                val sineInput = (x * (Math.PI * 2 / width) * waveFrequencies[i]) + phase + wavePhaseShifts[i]
-
-                // The sine result is mapped from [-1, 1] to [0, 1] so the wave is always above the baseline
+                // The sine input now just uses the continuously updated phase shift
+                val sineInput = (x * (Math.PI * 2 / width) * waveFrequencies[i]) + wavePhaseShifts[i]
                 val sineOutput = (sin(sineInput) * 0.5f + 0.5f)
-
-                val y = height - (maxWaveHeight * sineOutput)
-
+                val y = height - (waveMaxHeight * sineOutput)
                 wavePaths[i].lineTo(x.toFloat(), y.toFloat())
             }
+            wavePaths[i].lineTo(width.toFloat(), height.toFloat())
+            wavePaths[i].close()
             canvas.drawPath(wavePaths[i], wavePaints[i])
         }
     }

@@ -12,7 +12,7 @@ class GlowBorderView @JvmOverloads constructor(
 
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 25f
+        strokeWidth = 16f
         maskFilter = BlurMaskFilter(30f, BlurMaskFilter.Blur.NORMAL)
     }
 
@@ -23,10 +23,10 @@ class GlowBorderView @JvmOverloads constructor(
     private val gradientColors = intArrayOf(
         "#FF0000".toColorInt(), // Red
         "#FF7F00".toColorInt(), // Orange
-        "#FFFF00".toColorInt(), // Yellow
-        "#00FF00".toColorInt(), // Green
+//        "#FFFF00".toColorInt(), // Yellow
+//        "#00FF00".toColorInt(), // Green
         "#0000FF".toColorInt(), // Blue
-        "#4B0082".toColorInt(), // Indigo
+//        "#4B0082".toColorInt(), // Indigo
         "#9400D3".toColorInt(), // Violet
         "#FF0000".toColorInt()  // Red again to close the loop smoothly
     )

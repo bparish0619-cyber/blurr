@@ -248,6 +248,6 @@ class DialogueActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         sttManager.shutdown()
-        ttsManager.shutdown()
+//        ttsManager.shutdown()
     }
 } 

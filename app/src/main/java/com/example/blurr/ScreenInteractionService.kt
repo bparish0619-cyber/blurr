@@ -104,8 +104,8 @@ class ScreenInteractionService : AccessibilityService() {
         instance = this
         this.windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         Log.d("InteractionService", "Accessibility Service connected.")
-        setupGlowEffect()
-//        setupAudioWaveEffect()
+//        setupGlowEffect()
+        setupAudioWaveEffect()
 //        setupWaveBorderEffect()
     }
 
@@ -838,6 +838,8 @@ class ScreenInteractionService : AccessibilityService() {
         ).apply {
             // --- 3. Anchor the view to the bottom ---
             gravity = Gravity.BOTTOM
+//            y = 200 // Moves the view 200 pixels up from the bottom
+
         }
 
         Handler(Looper.getMainLooper()).post {
@@ -856,41 +858,32 @@ class ScreenInteractionService : AccessibilityService() {
         }
     }
 
+
+// --- REPLACE your old setupAudioWaveEffect with this new, simpler version ---
     /**
-     * UPDATED: Connects the TTS visualizer to our new wave view.
+     * Connects the TTS speaking state to the wave view for smooth animations.
      */
     private fun setupAudioWaveEffect() {
         showAudioWave()
+        val ttsManager = TTSManager.getInstance(this) ?: return
 
-        val ttsManager = TTSManager.getInstance(this)
-        if (ttsManager == null) {
-            Log.e("InteractionService", "TTSManager not available.")
-            return
-        }
+        // Set the initial amplitude to idle (0.0f)
+        audioWaveView?.setTargetAmplitude(0.0f)
 
-        ttsVisualizer = TtsVisualizer(ttsManager.audioSessionId) { amplitude ->
-            // This is now simpler, just pass the amplitude.
-            updateWaveAnimation(amplitude)
-        }
-
+        // This listener will now trigger the smooth animations
         ttsManager.utteranceListener = { isSpeaking ->
-            if (isSpeaking) {
-                ttsVisualizer?.start()
-            } else {
-                ttsVisualizer?.stop()
+            // Ensure UI calls are on the main thread
+            Handler(Looper.getMainLooper()).post {
+                if (isSpeaking) {
+                    // Animate to full amplitude
+                    audioWaveView?.setTargetAmplitude(1.0f)
+                } else {
+                    // Animate back down to idle amplitude
+                    audioWaveView?.setTargetAmplitude(0.0f)
+                }
             }
         }
     }
-
-    /**
-     * UPDATED: Updates the wave animation with the latest audio amplitude.
-     */
-    private fun updateWaveAnimation(amplitude: Float) {
-        // The view handles all the drawing logic internally
-        audioWaveView?.setAmplitude(amplitude)
-    }
-
-
 
 }
 

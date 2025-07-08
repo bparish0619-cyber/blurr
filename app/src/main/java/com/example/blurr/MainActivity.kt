@@ -346,13 +346,13 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 // Announce the task being performed
-                val announcement = "I will perform the task: $instruction"
+                val announcement = "I will now perform the task"
                 ttsManager.speakText(announcement)
                 
                 // Wait a bit for TTS to complete
-                delay(2000)
+                delay(1000)
                 
-                val finalAnswer = deepSearchAgent.execute(instruction)
+//                val finalAnswer = deepSearchAgent.execute(instruction)
                 
                 if (instruction == "a") {
                     ttsManager.speakText("I am ready to win Hundred Agents Hackathon, and start new era of personal agents")
@@ -379,10 +379,10 @@ class MainActivity : AppCompatActivity() {
                      val fin = Finger(this@MainActivity)
                      fin.home()
                 // } else {
-                    println("Final Answer: $finalAnswer")
-                    Log.d("MainActivity", "Deep Search complete. Answer: $finalAnswer")
-                    statusText.text = finalAnswer
-                    ttsManager.speakText(finalAnswer)
+//                    println("Final Answer: $finalAnswer")
+//                    Log.d("MainActivity", "Deep Search complete. Answer: $finalAnswer")
+//                    statusText.text = finalAnswer
+//                    ttsManager.speakText(finalAnswer)
                 // }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error executing task", e)
