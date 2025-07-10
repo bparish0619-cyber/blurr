@@ -1,4 +1,4 @@
-package com.example.blurr
+package com.example.blurr.services
 
 import android.app.Service
 import android.content.Intent
@@ -7,17 +7,13 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresApi
-import kotlinx.coroutines.delay
 import com.example.blurr.agent.ActionReflector
-import com.example.blurr.agent.AgentConfig
 import com.example.blurr.agent.AgentConfigFactory
-import com.example.blurr.agent.ClickableInfo
 import com.example.blurr.agent.InfoPool
 import com.example.blurr.agent.Manager
 import com.example.blurr.agent.Operator
 import com.example.blurr.agent.VisionHelper
 import com.example.blurr.agent.atomicActionSignatures
-
 import com.example.blurr.agent.tips.ReflectorTips
 import com.example.blurr.api.Eyes
 import com.example.blurr.api.Finger
@@ -27,18 +23,17 @@ import com.example.blurr.utilities.Persistent
 import com.example.blurr.utilities.TTSManager
 import com.example.blurr.utilities.UserIdManager
 import com.example.blurr.utilities.addResponse
-import com.example.blurr.utilities.addResponsePrePost
 import com.example.blurr.utilities.getReasoningModelApiResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
 
 class AgentTaskService : Service() {
 
@@ -54,7 +49,7 @@ class AgentTaskService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val inputText = intent?.getStringExtra("TASK_INSTRUCTION")
         val visionMode = intent?.getStringExtra("VISION_MODE") ?: "XML" // Default to XML mode
-        
+
         if (inputText == null) {
             Log.e("AgentTaskService", "Service started without user input. Stopping.")
             stopSelf()
@@ -99,7 +94,10 @@ class AgentTaskService : Service() {
 
             try {
                 while (true) {
-                    val currentTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()).format(Date())
+                    val currentTime = SimpleDateFormat(
+                        "yyyy-MM-dd HH:mm:ss.SSS",
+                        Locale.getDefault()
+                    ).format(Date())
 
                     try {
                         val xmlData = eyes.openXMLEyes()
@@ -138,11 +136,11 @@ class AgentTaskService : Service() {
 
     @RequiresApi(Build.VERSION_CODES.R)
     private suspend fun runAgentLogic(inputText: String, visionMode: String) {
-            delay(2000)
-        val tts = TTSManager.getInstance(this)
-        val taskStartTime = System.currentTimeMillis()
+        delay(2000)
+            val tts = TTSManager.Companion.getInstance(this)
+            val taskStartTime = System.currentTimeMillis()
             val context = this
-            val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
+            val API_KEY = ""
 
             // Create centralized configuration
             val config = AgentConfigFactory.create(
@@ -150,7 +148,7 @@ class AgentTaskService : Service() {
                 visionMode = visionMode,
                 apiKey = API_KEY
             )
-            
+
             // Log vision mode info for debugging
             VisionHelper.logVisionModeInfo(config)
 
@@ -174,7 +172,7 @@ class AgentTaskService : Service() {
             val manager = Manager()
             val operator = Operator(finger)
             val actionReflector = ActionReflector()
-    
+
             val reflectorTips = ReflectorTips()
 
             var iteration = 0
@@ -182,11 +180,11 @@ class AgentTaskService : Service() {
             val taskLog = File(logDir, "taskLog.txt")
 
             infoPool.instruction = inputText
-    
+
             infoPool.tips = persistent.loadTipsFromFile(tipsFile)
             infoPool.errToManagerThresh = config.errorThreshold
 
-            
+
 
             appendToFile(taskLog, "{step: 0, operation: init, instruction: $inputText, maxItr: ${config.maxIterations}, vision_mode: ${config.visionMode.displayName} }")
 
@@ -236,7 +234,8 @@ class AgentTaskService : Service() {
                                 .replace("```", "")
                                 .trim()
 
-                            val actObj = JSONObject(sanitizedJson) // Assuming actStr is a JSON string
+                            val actObj =
+                                JSONObject(sanitizedJson) // Assuming actStr is a JSON string
                             var hashKey = if (actObj.has("name")) actObj.getString("name") else actStr
                             if (actObj.has("arguments")) {
                                 val arguments = actObj.optJSONObject("arguments")
@@ -270,21 +269,21 @@ class AgentTaskService : Service() {
                 if (iteration == 1 && screenshotFile != null){
                     val perceptionTimeStart = System.currentTimeMillis()
                     val screenshotPath = File(screenshotsDir, "screenshot.jpg")
-                    
+
                     // Centralized perception handling
                     val perceptionResult = retina.getPerceptionInfos(context, screenshotFile, config)
-                    
+
                     infoPool.width = perceptionResult.width
                     infoPool.height = perceptionResult.height
                     infoPool.keyboardPre = perceptionResult.keyboardOpen
                     infoPool.perceptionInfosPre = perceptionResult.clickableInfos.toMutableList()
-                    
+
                     // Set XML data if available
                     if (config.isXmlMode && perceptionResult.xmlData.isNotEmpty()) {
                         infoPool.perceptionInfosPreXML = perceptionResult.xmlData
                         Log.d("AgentTaskService", "XML data captured: ${perceptionResult.xmlData.take(100)}...")
                     }
-                    
+
                     appendToFile(
                         taskLog,
                         "{step: $iteration, operation: perception, screenshot: $screenshotPath, perception_infos: ${
@@ -293,7 +292,7 @@ class AgentTaskService : Service() {
                             }
                         }, xml_mode: ${config.isXmlMode}, duration: ${(System.currentTimeMillis() - perceptionTimeStart) / 1000} seconds}"
                     )
-                    
+
                     if(perceptionResult.clickableInfos.isEmpty()) {
                         Log.d("AgentTaskService", "No perception infos found, stopping execution")
                     }
@@ -322,14 +321,15 @@ class AgentTaskService : Service() {
                 val promptPlan = manager.getPrompt(infoPool, config)
                 val chatPlan = manager.initChat()
                 val combinedChatPlan = VisionHelper.createChatResponse(
-                    "user", 
-                    promptPlan, 
-                    chatPlan, 
-                    config, 
+                    "user",
+                    promptPlan,
+                    chatPlan,
+                    config,
                     screenshotFile
                 )
 
-                val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = config.apiKey)
+                val outputPlan =
+                    getReasoningModelApiResponse(combinedChatPlan, apiKey = config.apiKey)
                 val parsedManagerPlan = manager.parseResponse(outputPlan.toString())
 
                 // Updating the InfoPool
@@ -358,13 +358,17 @@ class AgentTaskService : Service() {
                         Log.d("MainActivity", "\n### Experience Reflector ... ###\n")
                         val experienceReflectionStartTime = System.currentTimeMillis()
 
-                        
+
 
                         // Tips
                         val promptKnowledgeTips = reflectorTips.getPrompt(infoPool, config)
                         var chatKnowledgeTips = reflectorTips.initChat()
-                        var combinedTips = addResponse("user", promptKnowledgeTips, chatKnowledgeTips)
-                        val outputKnowledgeTips = getReasoningModelApiResponse(combinedTips, apiKey = config.apiKey) // Assuming KNOWLEDGE_REFLECTION_MODEL
+                        var combinedTips =
+                            addResponse("user", promptKnowledgeTips, chatKnowledgeTips)
+                        val outputKnowledgeTips = getReasoningModelApiResponse(
+                            combinedTips,
+                            apiKey = config.apiKey
+                        ) // Assuming KNOWLEDGE_REFLECTION_MODEL
                         val parsedResultKnowledgeTips = reflectorTips.parseResponse(
                             outputKnowledgeTips.toString()
                         )
@@ -395,13 +399,14 @@ class AgentTaskService : Service() {
                 val actionPrompt = operator.getPrompt(infoPool, config)
                 val actionChat = operator.initChat()
                 val actionCombinedChat = VisionHelper.createChatResponse(
-                    "user", 
-                    actionPrompt, 
-                    actionChat, 
-                    config, 
+                    "user",
+                    actionPrompt,
+                    actionChat,
+                    config,
                     screenshotFile
                 )
-                var actionOutput = getReasoningModelApiResponse(actionCombinedChat, apiKey = config.apiKey)
+                var actionOutput =
+                    getReasoningModelApiResponse(actionCombinedChat, apiKey = config.apiKey)
                 var parsedAction = operator.parseResponse(actionOutput.toString())
                 var actionThought = parsedAction["thought"]
                 var actionObjStr = parsedAction["action"]
@@ -476,9 +481,11 @@ class AgentTaskService : Service() {
                             }
                         }, xml_mode: ${config.isXmlMode}, duration: ${(perceptionPostEndTime - perceptionPostStartTime) / 1000} seconds}"
                     )
+
+
                     infoPool.perceptionInfosPost = postPerceptionResult.clickableInfos.toMutableList()
                     infoPool.keyboardPost = postPerceptionResult.keyboardOpen
-                    
+
                     // Set XML data if available
                     if (config.isXmlMode && postPerceptionResult.xmlData.isNotEmpty()) {
                         infoPool.perceptionInfosPostXML = postPerceptionResult.xmlData
@@ -493,16 +500,17 @@ class AgentTaskService : Service() {
                 val reflectionPrompt = actionReflector.getPrompt(infoPool, config)
                 val reflectionChat = actionReflector.initChat()
                 val reflectionCombinedChat = VisionHelper.createPrePostChatResponse(
-                    "user", 
-                    reflectionPrompt, 
-                    reflectionChat, 
-                    config, 
-                    screenshotFile, 
+                    "user",
+                    reflectionPrompt,
+                    reflectionChat,
+                    config,
+                    screenshotFile,
                     postScreenshotFile
                 )
 
                 // Sending to the GEMINI
-                val reflectionLLMOutput = getReasoningModelApiResponse(reflectionCombinedChat, apiKey = config.apiKey)
+                val reflectionLLMOutput =
+                    getReasoningModelApiResponse(reflectionCombinedChat, apiKey = config.apiKey)
                 val parsedReflection = actionReflector.parseResponse(reflectionLLMOutput.toString())
 
                 val outcome = parsedReflection["outcome"].toString()
@@ -530,7 +538,7 @@ class AgentTaskService : Service() {
                         val actionName = actionObject["name"] // Assuming actionObject is a JSONObject
                         if (atomicActionSignatures.containsKey(actionName)) {
 
-                
+
                                             if (errorMessage != null) {
                     currentErrorDescription += "; Error occurred while executing the action: $errorMessage"
                 }
@@ -540,6 +548,7 @@ class AgentTaskService : Service() {
                     }
                     "C" in outcome -> { // Failed. The last action produces no changes.
                         actionOutcome = "C"
+                        //TODO: Add currentErrorDescription
                     }
                     else -> {
                         throw IllegalArgumentException("Invalid outcome: $outcome")

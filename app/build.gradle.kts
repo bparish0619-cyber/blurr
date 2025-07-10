@@ -44,6 +44,8 @@ android {
             buildConfigField("String", "TAVILY_API", "\"$tavilyApiKeys\"")
             val mem0ApiKey = localProperties.getProperty("MEM0_API") ?: ""
             buildConfigField("String", "MEM0_API", "\"$mem0ApiKey\"")
+            val picovoiceApiKey = localProperties.getProperty("PICOVOICE_ACCESS_KEY") ?: ""
+            buildConfigField("String", "PICOVOICE_ACCESS_KEY", "\"$picovoiceApiKey\"")
 
         }
         debug {
@@ -55,6 +57,8 @@ android {
             buildConfigField("String", "GEMINI_API_KEYS", "\"$apiKeys\"")
             val mem0ApiKey = localProperties.getProperty("MEM0_API") ?: ""
             buildConfigField("String", "MEM0_API", "\"$mem0ApiKey\"")
+            val picovoiceApiKey = localProperties.getProperty("PICOVOICE_ACCESS_KEY") ?: ""
+            buildConfigField("String", "PICOVOICE_ACCESS_KEY", "\"$picovoiceApiKey\"")
         }
     }
     compileOptions {
@@ -108,5 +112,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     // https://mvnrepository.com/artifact/androidx.test.uiautomator/uiautomator
     implementation("androidx.test.uiautomator:uiautomator:2.3.0")
+    
+    // Porcupine Wake Word Engine
+    implementation("ai.picovoice:porcupine-android:3.0.2")
 
 }

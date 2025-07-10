@@ -233,23 +233,6 @@ class ScreenInteractionService : AccessibilityService() {
             start()
         }
     }
-//    /**
-//     * NEW: Sets up the voice detector and starts the glow effect.
-//     */
-//    private fun setupGlowEffect() {
-//        showGlowingBorder()
-//        updateGlowAnimation(100.0f)
-//
-////        // Initialize and start the voice detector
-////        voiceDetector = VoiceAmplitudeDetector(this) { amplitude ->
-////            // This lambda is called frequently with the latest voice amplitude.
-////            // Post the UI update to the main thread.
-////            Handler(Looper.getMainLooper()).post {
-////                updateGlowAnimation(amplitude)
-////            }
-////        }
-////        voiceDetector?.start()
-//    }
 
     /**
      * NEW: Hides and cleans up the glowing border view.
@@ -758,22 +741,6 @@ class ScreenInteractionService : AccessibilityService() {
     }
 
 
-    /**
-     * Traverses the UI tree and returns a list of all enabled, interactable elements.
-     */
-    suspend fun getInteractableElements(): List<InteractableElement> {
-        return withContext(Dispatchers.Default) {
-            val rootNode = rootInActiveWindow
-            if (rootNode == null) {
-                Log.e("InteractionService", "Root node is null, cannot get elements.")
-                return@withContext emptyList<InteractableElement>()
-            }
-
-            val interactableElements = mutableListOf<InteractableElement>()
-            findInteractableNodesRecursive(rootNode, interactableElements)
-            interactableElements
-        }
-    }
 
     /**
      * A private recursive helper to find and collect interactable nodes.

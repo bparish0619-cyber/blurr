@@ -11,9 +11,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
     <uses-permission android:name="android.permission.RECOGNIZE_SPEECH"/>
 
-
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -70,9 +67,20 @@
             android:foregroundServiceType="specialUse" />
 
         <service
-            android:name=".AgentTaskService"
+            android:name=".services.AgentTaskService"
             android:exported="false"
             android:foregroundServiceType="specialUse" />
+
+        <service android:name=".services.WakeWordService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
+        <service android:name=".services.EnhancedWakeWordService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
     </application>
 
 </manifest>

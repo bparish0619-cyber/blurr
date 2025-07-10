@@ -34,6 +34,9 @@ import com.example.blurr.utilities.UserIdManager
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import com.example.blurr.agent.VisionHelper
+import com.example.blurr.services.AgentTaskService
+import com.example.blurr.services.WakeWordService
+import com.example.blurr.services.EnhancedWakeWordService
 import com.example.blurr.utilities.getReasoningModelApiResponse
 
 class MainActivity : AppCompatActivity() {
@@ -52,6 +55,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var visionModeDescription: TextView
     private lateinit var voiceInputButton: ImageButton
     private lateinit var voiceStatusText: TextView
+    private lateinit var wakeWordButton: TextView
+    private lateinit var wakeWordEngineGroup: RadioGroup
+    private lateinit var sttEngineRadio: RadioButton
+    private lateinit var porcupineEngineRadio: RadioButton
 
     private lateinit var ttsManager: TTSManager
     private lateinit var sttManager: STTManager
@@ -110,6 +117,10 @@ class MainActivity : AppCompatActivity() {
         visionModeDescription = findViewById(R.id.visionModeDescription)
         voiceInputButton = findViewById(R.id.voiceInputButton)
         voiceStatusText = findViewById(R.id.voiceStatusText)
+        wakeWordButton = findViewById(R.id.wakeWordButton)
+        wakeWordEngineGroup = findViewById(R.id.wakeWordEngineGroup)
+        sttEngineRadio = findViewById(R.id.sttEngineRadio)
+        porcupineEngineRadio = findViewById(R.id.porcupineEngineRadio)
 
         grantPermission.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
@@ -150,6 +161,40 @@ class MainActivity : AppCompatActivity() {
             intent.data = url.toUri()
             startActivity(intent)
         }
+        wakeWordButton.setOnClickListener {
+            if (EnhancedWakeWordService.isRunning) {
+                // Service is running, so stop it
+                Log.d("MainActivity", "Stopping EnhancedWakeWordService.")
+                stopService(Intent(this, EnhancedWakeWordService::class.java))
+                Toast.makeText(this, getString(R.string.wake_word_disabled), Toast.LENGTH_SHORT).show()
+            } else {
+                // Service is not running, so start it
+                Log.d("MainActivity", "Starting EnhancedWakeWordService.")
+                val usePorcupine = porcupineEngineRadio.isChecked
+                
+                if (usePorcupine) {
+                    // Check if Porcupine access key is configured
+                    if (!isPorcupineAccessKeyConfigured()) {
+                        Toast.makeText(this, getString(R.string.porcupine_access_key_required), Toast.LENGTH_LONG).show()
+                        return@setOnClickListener
+                    }
+                }
+                
+                val serviceIntent = Intent(this, EnhancedWakeWordService::class.java).apply {
+                    putExtra(EnhancedWakeWordService.EXTRA_USE_PORCUPINE, usePorcupine)
+                }
+                
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    ContextCompat.startForegroundService(this, serviceIntent)
+                    val engineName = if (usePorcupine) "Porcupine" else "STT"
+                    Toast.makeText(this, getString(R.string.wake_word_enabled, engineName), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Microphone permission is required for wake word.", Toast.LENGTH_LONG).show()
+                    askForNotificationPermission()
+                }
+            }
+            updateUI() // Update button text immediately
+        }
     }
 
     @SuppressLint("SetTextI18n")
@@ -168,7 +213,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     // Check if clarification is needed
                     val needsClarification = checkIfClarificationNeeded(instruction)
-                    
+
                     if (needsClarification.first) {
                         // Start dialogue for clarification
                         startClarificationDialogue(instruction, needsClarification.second)
@@ -244,7 +289,7 @@ class MainActivity : AppCompatActivity() {
     private fun startVoiceInput() {
         voiceStatusText.text = getString(R.string.listening)
         voiceInputButton.isPressed = true
-        
+
         sttManager.startListening(
             onResult = { recognizedText ->
                 runOnUiThread {
@@ -252,7 +297,7 @@ class MainActivity : AppCompatActivity() {
                     voiceInputButton.isPressed = false
                     inputField.setText(recognizedText)
                     Toast.makeText(this, "Recognized: $recognizedText", Toast.LENGTH_SHORT).show()
-                    
+
                     // Automatically perform the task
                     performTaskFromVoiceInput(recognizedText)
                 }
@@ -275,12 +320,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun performTaskFromVoiceInput(instruction: String) {
         statusText.text = "Processing voice command..."
-        
+
         lifecycleScope.launch {
             try {
                 // Check if clarification is needed
                 val needsClarification = checkIfClarificationNeeded(instruction)
-                
+
                 if (needsClarification.first) {
                     // Start dialogue for clarification
                     startClarificationDialogue(instruction, needsClarification.second)
@@ -348,12 +393,12 @@ class MainActivity : AppCompatActivity() {
                 // Announce the task being performed
                 val announcement = "I will now perform the task"
                 ttsManager.speakText(announcement)
-                
+
                 // Wait a bit for TTS to complete
                 delay(1000)
-                
+
 //                val finalAnswer = deepSearchAgent.execute(instruction)
-                
+
                 if (instruction == "a") {
                     ttsManager.speakText("I am ready to win Hundred Agents Hackathon, and start new era of personal agents")
                     return@launch
@@ -454,6 +499,21 @@ class MainActivity : AppCompatActivity() {
         val isPermissionGranted = isAccessibilityServiceEnabled()
         tvPermissionStatus.text = if (isPermissionGranted) "Permission: Granted" else "Permission: Not Granted"
         tvPermissionStatus.setTextColor(if (isPermissionGranted) Color.GREEN else Color.RED)
+        if (EnhancedWakeWordService.isRunning) {
+            wakeWordButton.text = "DISABLE WAKE WORD"
+        } else {
+            wakeWordButton.text = "ENABLE WAKE WORD"
+        }
+    }
+
+    private fun isPorcupineAccessKeyConfigured(): Boolean {
+        // Check if the access key is configured in BuildConfig
+        return try {
+            val accessKey = com.example.blurr.BuildConfig.PICOVOICE_ACCESS_KEY
+            accessKey.isNotEmpty() && accessKey != "YOUR_PICOVOICE_ACCESS_KEY_HERE"
+        } catch (e: Exception) {
+            false
+        }
     }
     private fun askForNotificationPermission() {
         // Request notification permission
@@ -473,7 +533,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        
+
         // Request microphone permission for voice input
         when {
             ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
