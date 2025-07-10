@@ -30,6 +30,7 @@ class EnhancedWakeWordService : Service() {
     override fun onCreate() {
         super.onCreate()
         isRunning = true
+        Log.d("EnhancedWakeWordService", "Service onCreate() called, isRunning set to true")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -98,6 +99,8 @@ class EnhancedWakeWordService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         
+        Log.d("EnhancedWakeWordService", "Service onDestroy() called")
+        
         porcupineDetector?.stop()
         porcupineDetector = null
         
@@ -105,7 +108,7 @@ class EnhancedWakeWordService : Service() {
         sttDetector = null
         
         isRunning = false
-        Log.d("EnhancedWakeWordService", "Service destroyed.")
+        Log.d("EnhancedWakeWordService", "Service destroyed, isRunning set to false")
     }
 
     override fun onBind(intent: Intent?): IBinder? {

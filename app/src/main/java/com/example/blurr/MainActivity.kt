@@ -162,12 +162,19 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
         wakeWordButton.setOnClickListener {
+            Log.d("MainActivity", "Wake word button clicked, service isRunning: ${EnhancedWakeWordService.isRunning}")
+            
             if (EnhancedWakeWordService.isRunning) {
                 // Service is running, so stop it
                 Log.d("MainActivity", "Stopping EnhancedWakeWordService.")
                 stopService(Intent(this, EnhancedWakeWordService::class.java))
                 Toast.makeText(this, getString(R.string.wake_word_disabled), Toast.LENGTH_SHORT).show()
-            } else {
+                
+                handler.postDelayed({
+                    if (!EnhancedWakeWordService.isRunning) {
+                        updateUI()
+                    }
+                }, 500)             } else {
                 // Service is not running, so start it
                 Log.d("MainActivity", "Starting EnhancedWakeWordService.")
                 val usePorcupine = porcupineEngineRadio.isChecked
@@ -188,12 +195,19 @@ class MainActivity : AppCompatActivity() {
                     ContextCompat.startForegroundService(this, serviceIntent)
                     val engineName = if (usePorcupine) "Porcupine" else "STT"
                     Toast.makeText(this, getString(R.string.wake_word_enabled, engineName), Toast.LENGTH_SHORT).show()
+                    println("Started wake")
+
+                    handler.postDelayed({
+                        if (EnhancedWakeWordService.isRunning) {
+                            updateUI()
+                        }
+                    }, 500) // 500ms delay
+
                 } else {
                     Toast.makeText(this, "Microphone permission is required for wake word.", Toast.LENGTH_LONG).show()
                     askForNotificationPermission()
                 }
             }
-            updateUI() // Update button text immediately
         }
     }
 
@@ -268,6 +282,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun setupVoiceInput() {
         voiceInputButton.setOnTouchListener { _, event ->
             when (event.action) {
@@ -499,7 +514,9 @@ class MainActivity : AppCompatActivity() {
         val isPermissionGranted = isAccessibilityServiceEnabled()
         tvPermissionStatus.text = if (isPermissionGranted) "Permission: Granted" else "Permission: Not Granted"
         tvPermissionStatus.setTextColor(if (isPermissionGranted) Color.GREEN else Color.RED)
-        if (EnhancedWakeWordService.isRunning) {
+
+        val serviceRunning = EnhancedWakeWordService.isRunning
+        if (serviceRunning) {
             wakeWordButton.text = "DISABLE WAKE WORD"
         } else {
             wakeWordButton.text = "ENABLE WAKE WORD"
