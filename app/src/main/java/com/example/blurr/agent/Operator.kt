@@ -43,7 +43,11 @@ val baseAtomicActionSignatures = mapOf(
 
     "Home" to AtomicActionSignature(emptyList()) { "Go to the home page." },
 
-    "Wait" to AtomicActionSignature(emptyList()) { "Wait for 10 seconds to give more time for a page loading" }
+    "Wait" to AtomicActionSignature(emptyList()) { "Wait for 10 seconds to give more time for a page loading" },
+
+    "Speak" to AtomicActionSignature(
+        listOf("message")
+    ) { "Speak the \"message\" to the user. Use this when you need to communicate important information, ask for clarification, provide status updates, or give instructions to the user. This message will be spoken on loud speaker, so dont say private information." }
 )
 
 // Function to get atomic action signatures based on configuration
@@ -233,6 +237,18 @@ class Operator(private val finger: Finger) : BaseAgent() {
             "home" -> finger.home()
             "switch_app" -> finger.switchApp()
             "wait" -> Thread.sleep(10_000)
+            "speak" -> {
+                val message = args["message"]?.toString()?.trim()
+                if (message != null) {
+                    // Use speakToUser to ensure the message is always spoken
+                    kotlinx.coroutines.runBlocking {
+                        val ttsManager = com.example.blurr.utilities.TTSManager.getInstance(context)
+                        ttsManager.speakToUser(message)
+                    }
+                } else {
+                    println("Missing message for Speak action")
+                }
+            }
             "open_app" -> {
                 if (config?.enableDirectAppOpening == true) {
                     val appName = args["app_name"]?.toString()?.trim()

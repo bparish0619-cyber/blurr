@@ -33,6 +33,14 @@ The TTSManager automatically uses the build configuration:
 ttsManager.speakText("Hello World")
 ```
 
+### User-Facing Messages (Always Spoken)
+For important messages that should always be spoken to the user:
+
+```kotlin
+// This will always speak regardless of debug mode
+ttsManager.speakToUser("Task completed successfully")
+```
+
 ### Manual Override
 You can manually control the debug mode at runtime:
 
@@ -52,8 +60,9 @@ val isEnabled = ttsManager.isDebugModeEnabled()
 ## Implementation Details
 
 ### TTSManager Changes
-- Added `isDebugMode` property that reads from `BuildConfig.DEBUG`
+- Added `isDebugMode` property that reads from `BuildConfig.SPEAK_INSTRUCTIONS`
 - Modified `speakText()` method to check debug mode before speaking
+- Added `speakToUser()` method that always speaks regardless of debug mode
 - Added `setDebugMode()` method for manual override
 - Added `isDebugModeEnabled()` method to check current status
 - Enhanced logging to show debug mode status
@@ -96,6 +105,18 @@ ttsManager.speakText("This won't speak")
 ttsManager.setDebugMode(true)
 ttsManager.speakText("This will speak")
 // Output: "TTS: Speaking 'This will speak'"
+```
+
+### Scenario 4: User-Facing Messages
+```kotlin
+// This always speaks regardless of debug mode
+ttsManager.speakToUser("Your task has been completed")
+// Output: "TTS: Speaking to user - 'Your task has been completed'"
+
+// Even with debug mode disabled
+ttsManager.setDebugMode(false)
+ttsManager.speakToUser("Important message for user")
+// Output: "TTS: Speaking to user - 'Important message for user'"
 ```
 
 ## Migration

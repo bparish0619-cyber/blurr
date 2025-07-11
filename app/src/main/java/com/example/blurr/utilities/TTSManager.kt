@@ -82,6 +82,21 @@ class TTSManager private constructor(context: Context) : OnInitListener {
     }
 
     /**
+     * Speak text regardless of debug mode setting.
+     * This function is used for important user-facing messages that should always be spoken.
+     * @param text The text to speak to the user
+     */
+    suspend fun speakToUser(text: String) {
+        isTTSInitialized.await()
+        val params = Bundle().apply {
+            putInt(TextToSpeech.Engine.KEY_PARAM_SESSION_ID, audioSessionId)
+        }
+        val utteranceId = this.hashCode().toString() + "" + System.currentTimeMillis()
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+        println("TTS: Speaking to user - '$text'")
+    }
+
+    /**
      * Override the debug mode setting
      * @param debugMode true to enable TTS, false to disable
      */
