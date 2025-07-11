@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresApi
+import com.example.blurr.BuildConfig
 import com.example.blurr.agent.ActionReflector
 import com.example.blurr.agent.AgentConfigFactory
 import com.example.blurr.agent.InfoPool
@@ -19,6 +20,7 @@ import com.example.blurr.api.Eyes
 import com.example.blurr.api.Finger
 import com.example.blurr.api.MemoryService
 import com.example.blurr.api.Retina
+import com.example.blurr.utilities.AppContextUtility
 import com.example.blurr.utilities.Persistent
 import com.example.blurr.utilities.TTSManager
 import com.example.blurr.utilities.UserIdManager
@@ -57,10 +59,6 @@ class AgentTaskService : Service() {
         }
 
         Log.d("AgentTaskService", "Starting agent task with input: $inputText, vision mode: $visionMode")
-
-        // Start XML logging in background
-        // startXmlLogging()
-
 
        agentJob = CoroutineScope(Dispatchers.IO).launch {
            runAgentLogic(inputText, visionMode)
@@ -142,11 +140,11 @@ class AgentTaskService : Service() {
             val context = this
             val API_KEY = ""
 
-            // Create centralized configuration
             val config = AgentConfigFactory.create(
                 context = context,
                 visionMode = visionMode,
-                apiKey = API_KEY
+                apiKey = API_KEY,
+                enableDirectAppOpening = BuildConfig.ENABLE_DIRECT_APP_OPENING // Set to true for debugging - will be controlled by build config once generated
             )
 
             // Log vision mode info for debugging
@@ -411,15 +409,16 @@ class AgentTaskService : Service() {
                 var actionThought = parsedAction["thought"]
                 var actionObjStr = parsedAction["action"]
                 var actionDesc = parsedAction["description"]
-
-                var actionThinkingTimeEnd = System.currentTimeMillis()
+                println("@@@@@@@@@@@@@@@@@")
+                println(parsedAction)
+                val actionThinkingTimeEnd = System.currentTimeMillis()
 
                 infoPool.lastActionThought = actionThought.toString()
 
-                var actionExecTimeStart = System.currentTimeMillis()
+                val actionExecTimeStart = System.currentTimeMillis()
 
-                val (actionObject, numOfAtomicAction, errorMessage) = operator.execute(
-                    actionObjStr.toString(), infoPool, context
+                val (actionObject, _, errorMessage) = operator.execute(
+                    actionObjStr.toString(), infoPool, context, config
                 )
 
                 var actionExecTimeEnd = System.currentTimeMillis()

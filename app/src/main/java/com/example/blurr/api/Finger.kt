@@ -2,6 +2,7 @@ package com.example.blurr.api
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.util.Log
 import com.example.blurr.ScreenInteractionService
 
@@ -40,6 +41,35 @@ class Finger(private val context: Context) {
             Log.e(TAG, "Failed to start ChatActivity. Make sure it's defined in your AndroidManifest.xml", e)
         }
     }
+
+    /**
+     * Opens an app directly using package manager (requires QUERY_ALL_PACKAGES permission).
+     * This method is intended for debugging purposes only and should be disabled in production.
+     * 
+     * @param packageName The package name of the app to open
+     * @return true if the app was successfully launched, false otherwise
+     */
+    fun openApp(packageName: String): Boolean {
+        Log.d(TAG, "Attempting to open app with package: $packageName")
+        return try {
+            val packageManager = context.packageManager
+            val intent = packageManager.getLaunchIntentForPackage(packageName)
+            
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                Log.d(TAG, "Successfully launched app: $packageName")
+                true
+            } else {
+                Log.e(TAG, "No launch intent found for package: $packageName")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open app: $packageName", e)
+            false
+        }
+    }
+
     /**
      * Taps a point on the screen.
      */
