@@ -244,10 +244,10 @@ class Operator(private val finger: Finger) : BaseAgent() {
             "speak" -> {
                 val message = args["message"]?.toString()?.trim()
                 if (message != null) {
-                    // Use speakToUser to ensure the message is always spoken
+                    // Use SpeechCoordinator to ensure no conflicts with STT
                     kotlinx.coroutines.runBlocking {
-                        val ttsManager = com.example.blurr.utilities.TTSManager.getInstance(context)
-                        ttsManager.speakToUser(message)
+                        val speechCoordinator = com.example.blurr.utilities.SpeechCoordinator.getInstance(context)
+                        speechCoordinator.speakToUser(message)
                     }
                 } else {
                     println("Missing message for Speak action")
@@ -256,13 +256,13 @@ class Operator(private val finger: Finger) : BaseAgent() {
             "ask" -> {
                 val question = args["question"]?.toString()?.trim()
                 if (question != null) {
-                    // Use speakToUser to ask the question
+                    // Use SpeechCoordinator to ask the question (ensures no STT conflicts)
                     kotlinx.coroutines.runBlocking {
-                        val ttsManager = com.example.blurr.utilities.TTSManager.getInstance(context)
-                        ttsManager.speakToUser(question)
+                        val speechCoordinator = com.example.blurr.utilities.SpeechCoordinator.getInstance(context)
+                        speechCoordinator.speakToUser(question)
                     }
                     
-                    // Get user response using UserInputManager
+                    // Get user response using UserInputManager (which now uses SpeechCoordinator internally)
                     val userInputManager = com.example.blurr.utilities.UserInputManager(context)
                     val userResponse = userInputManager.askQuestion(question)
                     

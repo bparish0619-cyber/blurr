@@ -135,7 +135,7 @@ class AgentTaskService : Service() {
     @RequiresApi(Build.VERSION_CODES.R)
     private suspend fun runAgentLogic(inputText: String, visionMode: String) {
         delay(2000)
-            val tts = TTSManager.Companion.getInstance(this)
+            val speechCoordinator = com.example.blurr.utilities.SpeechCoordinator.getInstance(this)
             val taskStartTime = System.currentTimeMillis()
             val context = this
             val API_KEY = ""
@@ -333,7 +333,7 @@ class AgentTaskService : Service() {
                 // Updating the InfoPool
                 infoPool.plan = parsedManagerPlan["plan"].toString()
                 infoPool.currentSubgoal =  parsedManagerPlan["current_subgoal"].toString()
-                tts.speakText(infoPool.currentSubgoal)
+                speechCoordinator.speakText(infoPool.currentSubgoal)
                 appendToFile(taskLog, "{ \n" +
                         "                    \"step\": $iteration, \n" +
                         "                    \"operation\": \"planning\", \n" +
@@ -388,7 +388,7 @@ class AgentTaskService : Service() {
                     val taskEndTime = System.currentTimeMillis()
                     appendToFile(taskLog, "{step: $iteration, operation: finish, finish_flag: success, final_info_pool: $infoPool, task_duration: ${(taskEndTime - taskStartTime)/1000} seconds}")
                     Log.i("MainActivity", "Task finished successfully by planner.")
-                    tts.speakText("Task finished")
+                    speechCoordinator.speakText("Task finished")
                     return
                 }
 
@@ -521,7 +521,7 @@ class AgentTaskService : Service() {
 
                 var actionOutcome: String
                 var currentErrorDescription = errorDescription
-                tts.speakText("Outcome was $outcome")
+                speechCoordinator.speakText("Outcome was $outcome")
                 when {
                     "A" in outcome -> { // Successful. The result of the last action meets the expectation.
                         actionOutcome = "A"
