@@ -59,6 +59,28 @@ When the feature is enabled, the agent can use the `Open_App` action:
 }
 ```
 
+The agent can also use the `Speak` action to communicate with the user:
+
+```json
+{
+    "name": "Speak",
+    "arguments": {
+        "message": "I found the Chrome app and I'm opening it now."
+    }
+}
+```
+
+And the `Ask` action to get user input:
+
+```json
+{
+    "name": "Ask",
+    "arguments": {
+        "question": "I found multiple apps with similar names. Which one do you want me to open?"
+    }
+}
+```
+
 ## Implementation Details
 
 ### 1. AgentConfig Changes
@@ -85,6 +107,22 @@ The `Open_App` action is only available when `enableDirectAppOpening` is `true`:
 ) { "Open the app named \"app_name\" directly using package manager. This is a debug feature that bypasses the traditional UI navigation." }
 ```
 
+The `Speak` action is always available and allows the agent to communicate with the user:
+
+```kotlin
+"Speak" to AtomicActionSignature(
+    listOf("message")
+) { "Speak the \"message\" to the user. Use this when you need to communicate important information, provide status updates, or give instructions to the user. This message will be spoken on loud speaker, so dont say private information." }
+```
+
+The `Ask` action is always available and allows the agent to get user input:
+
+```kotlin
+"Ask" to AtomicActionSignature(
+    listOf("question")
+) { "Ask the \"question\" to the user and wait for their response. Use this when you need clarification, more information, or user input to proceed with the task. The user's response will be added to the instruction to help you complete the task." }
+```
+
 ## Behavior
 
 When the `enableDirectAppOpening` flag is enabled:
@@ -96,6 +134,10 @@ When the flag is disabled:
 - The `Open_App` action is completely unavailable
 - The agent must use traditional UI navigation (Tap, Swipe, etc.) to open apps
 
+The `Speak` action is always available regardless of any flags and allows the agent to communicate directly with the user.
+
+The `Ask` action is always available and allows the agent to get user input and update the instruction accordingly.
+
 ## Error Handling
 
 When the Open_App action is used:
@@ -106,6 +148,16 @@ When the Open_App action is used:
 When the Open_App action is disabled:
 - Action not available: The action is not included in the available actions list
 - If somehow called: Prints "Open_App action is disabled"
+
+When the Speak action is used:
+- Missing message: Prints "Missing message for Speak action"
+- Message will always be spoken using `speakToUser()` regardless of debug settings
+
+When the Ask action is used:
+- Missing question: Prints "Missing question for Ask action"
+- Question will be spoken using `speakToUser()`
+- User response will be captured and added to the instruction
+- Instruction will be updated with both the question and response
 
 ## Security Considerations
 

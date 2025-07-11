@@ -8,6 +8,9 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.*
 
 class STTManager(private val context: Context) {
@@ -17,19 +20,28 @@ class STTManager(private val context: Context) {
     private var onResultCallback: ((String) -> Unit)? = null
     private var onErrorCallback: ((String) -> Unit)? = null
     private var onListeningStateChange: ((Boolean) -> Unit)? = null
+    private var isInitialized = false
     
-    init {
-        initializeSpeechRecognizer()
-    }
+    // Remove initialization from constructor - will be done lazily on main thread
     
     private fun initializeSpeechRecognizer() {
+        if (isInitialized) return
+        
         if (SpeechRecognizer.isRecognitionAvailable(context)) {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
-            speechRecognizer?.setRecognitionListener(createRecognitionListener())
+            try {
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+                speechRecognizer?.setRecognitionListener(createRecognitionListener())
+                isInitialized = true
+                Log.d("STTManager", "Speech recognizer initialized successfully")
+            } catch (e: Exception) {
+                Log.e("STTManager", "Failed to initialize speech recognizer", e)
+            }
         } else {
             Log.e("STTManager", "Speech recognition not available on this device")
         }
     }
+    
+
     
     private fun createRecognitionListener(): RecognitionListener {
         return object : RecognitionListener {
@@ -108,11 +120,6 @@ class STTManager(private val context: Context) {
         onError: (String) -> Unit,
         onListeningStateChange: (Boolean) -> Unit
     ) {
-        if (speechRecognizer == null) {
-            onError("Speech recognition not available")
-            return
-        }
-        
         if (isListening) {
             Log.w("STTManager", "Already listening")
             return
@@ -122,35 +129,54 @@ class STTManager(private val context: Context) {
         this.onErrorCallback = onError
         this.onListeningStateChange = onListeningStateChange
         
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-        }
-        
-        try {
-            speechRecognizer?.startListening(intent)
-            Log.d("STTManager", "Started listening")
-        } catch (e: Exception) {
-            Log.e("STTManager", "Error starting speech recognition", e)
-            onError("Failed to start speech recognition: ${e.message}")
+        // Initialize on main thread if needed
+        CoroutineScope(Dispatchers.Main).launch {
+            initializeSpeechRecognizer()
+            
+            if (speechRecognizer == null) {
+                onError("Speech recognition not available")
+                return@launch
+            }
+            
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            }
+            
+            try {
+                speechRecognizer?.startListening(intent)
+                Log.d("STTManager", "Started listening")
+            } catch (e: Exception) {
+                Log.e("STTManager", "Error starting speech recognition", e)
+                onError("Failed to start speech recognition: ${e.message}")
+            }
         }
     }
     
     fun stopListening() {
-        if (isListening) {
-            speechRecognizer?.stopListening()
-            Log.d("STTManager", "Stopped listening")
+        if (isListening && speechRecognizer != null) {
+            try {
+                speechRecognizer?.stopListening()
+                Log.d("STTManager", "Stopped listening")
+            } catch (e: Exception) {
+                Log.e("STTManager", "Error stopping speech recognition", e)
+            }
         }
     }
     
     fun isCurrentlyListening(): Boolean = isListening
     
     fun shutdown() {
-        speechRecognizer?.destroy()
+        try {
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {
+            Log.e("STTManager", "Error destroying speech recognizer", e)
+        }
         speechRecognizer = null
         isListening = false
+        isInitialized = false
         Log.d("STTManager", "STT Manager shutdown")
     }
 } 
