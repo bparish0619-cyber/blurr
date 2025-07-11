@@ -49,6 +49,7 @@ android {
             
             // Debug flag for direct app opening (set to false for production)
             buildConfigField("boolean", "ENABLE_DIRECT_APP_OPENING", "true")
+            buildConfigField("boolean", "SPEAK_INSTRUCTIONS", "false")
 
         }
         debug {
@@ -65,6 +66,7 @@ android {
             
             // Debug flag for direct app opening (set to true for debugging, false for production)
             buildConfigField("boolean", "ENABLE_DIRECT_APP_OPENING", "true")
+            buildConfigField("boolean", "SPEAK_INSTRUCTIONS", "false")
         }
     }
     compileOptions {

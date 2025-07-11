@@ -17,6 +17,14 @@ class TTSManager private constructor(context: Context) : OnInitListener {
     private var isTTSInitialized = CompletableDeferred<Unit>()
     val audioSessionId: Int
     var utteranceListener: ((isSpeaking: Boolean) -> Unit)? = null
+    
+    // Debug flag to control TTS output
+    private var isDebugMode: Boolean = try {
+        // Try to get from BuildConfig, fallback to true for safety
+        com.example.blurr.BuildConfig.SPEAK_INSTRUCTIONS
+    } catch (e: Exception) {
+        true // Default to true if BuildConfig is not available
+    }
 
     init {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -50,7 +58,7 @@ class TTSManager private constructor(context: Context) : OnInitListener {
                 }
             })
             isTTSInitialized.complete(Unit)
-            println("TTS Singleton is ready with Audio Session ID: $audioSessionId")
+            println("TTS Singleton is ready with Audio Session ID: $audioSessionId (Debug Mode: $isDebugMode)")
         } else {
             println("TTS Initialization failed")
             isTTSInitialized.completeExceptionally(Exception("TTS Initialization failed"))
@@ -58,13 +66,35 @@ class TTSManager private constructor(context: Context) : OnInitListener {
     }
 
     suspend fun speakText(text: String) {
+        // Only speak if in debug mode
+        if (!isDebugMode) {
+            println("TTS: Skipping speech in release mode - '$text'")
+            return
+        }
+        
         isTTSInitialized.await()
         val params = Bundle().apply {
             putInt(TextToSpeech.Engine.KEY_PARAM_SESSION_ID, audioSessionId)
         }
         val utteranceId = this.hashCode().toString() + "" + System.currentTimeMillis()
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+        println("TTS: Speaking '$text'")
     }
+
+    /**
+     * Override the debug mode setting
+     * @param debugMode true to enable TTS, false to disable
+     */
+    fun setDebugMode(debugMode: Boolean) {
+        isDebugMode = debugMode
+        println("TTS Debug Mode set to: $isDebugMode")
+    }
+
+    /**
+     * Get current debug mode status
+     * @return true if TTS is enabled, false if disabled
+     */
+    fun isDebugModeEnabled(): Boolean = isDebugMode
 
     fun shutdown() {
         // This should only be called if the entire app is closing
