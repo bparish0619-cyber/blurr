@@ -10,15 +10,18 @@ The `UserInputManager` class has been updated to use Speech-to-Text (STT) for ha
 - Uses Android's built-in `SpeechRecognizer` API
 - Integrates with the existing `STTManager` class
 - Supports real-time speech recognition with timeout handling
+- **Multiple Attempts**: Up to 3 speech recognition attempts if no speech is detected
 
 ### 2. Robust Error Handling
 - Checks if speech recognition is available on the device
-- Provides fallback responses when STT fails
+- Provides fallback responses when all STT attempts fail
 - Handles network errors, timeouts, and recognition failures gracefully
+- Re-asks the question between attempts for better user experience
 
 ### 3. Timeout Management
-- **Speech Timeout**: 30 seconds for speech input
+- **Speech Timeout**: 30 seconds per attempt for speech input
 - **Fallback Timeout**: 5 seconds for fallback response
+- **Attempt Delay**: 2-second delay between attempts
 - Automatic cleanup of resources
 
 ## How It Works
@@ -31,10 +34,12 @@ val userResponse = userInputManager.askQuestion("What is your name?")
 
 ### 2. Speech Recognition Process
 1. **Availability Check**: Verifies if speech recognition is available
-2. **Start Listening**: Activates microphone and starts recognition
-3. **Timeout Handling**: Waits up to 30 seconds for user speech
-4. **Result Processing**: Processes recognized text or handles errors
-5. **Fallback**: Uses fallback response if STT fails
+2. **Multiple Attempts**: Up to 3 attempts for speech recognition
+3. **Start Listening**: Activates microphone and starts recognition
+4. **Timeout Handling**: Waits up to 30 seconds per attempt for user speech
+5. **Re-ask Question**: Re-asks the question between attempts if needed
+6. **Result Processing**: Processes recognized text or handles errors
+7. **Fallback**: Uses fallback response if all STT attempts fail
 
 ### 3. Response Handling
 - **Success**: Returns the recognized speech text
@@ -82,9 +87,9 @@ The following permissions are already included in `AndroidManifest.xml`:
 - **User Experience**: Continues operation
 
 ### 3. Timeout
-- **Cause**: User doesn't speak within 30 seconds
-- **Handling**: Uses fallback response
-- **User Experience**: No hanging or freezing
+- **Cause**: User doesn't speak within 30 seconds across all 3 attempts
+- **Handling**: Uses fallback response after all attempts fail
+- **User Experience**: Multiple chances to provide input, no hanging or freezing
 
 ### 4. Recognition Errors
 - **Cause**: Poor audio quality, background noise, etc.
@@ -95,8 +100,9 @@ The following permissions are already included in `AndroidManifest.xml`:
 
 ### Timeout Settings
 ```kotlin
-private const val SPEECH_TIMEOUT_MS = 30000L // 30 seconds
+private const val SPEECH_TIMEOUT_MS = 30000L // 30 seconds per attempt
 private const val FALLBACK_TIMEOUT_MS = 5000L // 5 seconds
+private const val MAX_SPEECH_ATTEMPTS = 3 // Maximum number of attempts
 ```
 
 ### Language Settings
@@ -107,9 +113,10 @@ Currently uses the device's default locale. Can be customized in `STTManager` if
 To test the implementation:
 
 1. **Normal Flow**: Ask a question and speak a response
-2. **Timeout Test**: Ask a question and remain silent
-3. **Error Test**: Test on devices without speech recognition
-4. **Network Test**: Test with poor network conditions
+2. **Multiple Attempts Test**: Ask a question, remain silent for first attempt, then speak on second attempt
+3. **Timeout Test**: Ask a question and remain silent for all 3 attempts
+4. **Error Test**: Test on devices without speech recognition
+5. **Network Test**: Test with poor network conditions
 
 ## Future Enhancements
 

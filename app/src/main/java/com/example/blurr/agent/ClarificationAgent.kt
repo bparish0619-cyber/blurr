@@ -6,26 +6,8 @@ class ClarificationAgent : BaseAgent() {
 
     override fun initChat(): List<Pair<String, List<TextPart>>> {
         val systemPrompt = """
-            You are a helpful AI assistant that analyzes user instructions and determines if they need clarification.
-            Your goal is to identify unclear or ambiguous instructions and generate specific questions to clarify them.
-            
-            You should ask clarifying questions when:
-            1. The instruction lacks specific details needed for execution
-            2. There are multiple possible interpretations
-            3. Required information is missing (names, apps, preferences, etc.)
-            4. The instruction is too vague to execute properly
-            
-            Examples of unclear instructions that need clarification:
-            - "Message my brother happy birthday" (needs: brother's name, messaging app)
-            - "Open my photos" (needs: which photo app, what to do with photos)
-            - "Call someone" (needs: who to call)
-            - "Set an alarm" (needs: time, label, repeat settings)
-            
-            Examples of clear instructions that don't need clarification:
-            - "Open WhatsApp"
-            - "Go to home screen"
-            - "Take a screenshot"
-            - "Open Settings app"
+            Think as if you are a human user operating the phone.
+            You will be given a task to perform, based on that you have to find what is missing in the instruction that is important to fulfill the task.
         """.trimIndent()
 
         return listOf("user" to listOf(TextPart(systemPrompt)))
