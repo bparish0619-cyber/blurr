@@ -9,6 +9,9 @@ import com.example.blurr.api.GeminiApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+
+// TODO This fiel is not used anywhere but we still keep it because
+//  this implement a agent that adds apps in the context of the agent which can be used for multiple app tasks
 data class AppInfo(
     val appName: String,
     val packageName: String,
@@ -32,7 +35,7 @@ class AppContextUtility(private val context: Context) {
         return try {
             val pm = context.packageManager
             val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-            
+
             apps.map { app ->
                 AppInfo(
                     appName = app.loadLabel(pm).toString(),
@@ -55,7 +58,7 @@ class AppContextUtility(private val context: Context) {
         return try {
             val pm = context.packageManager
             val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-            
+
             apps.filter { app ->
                 (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0
             }.map { app ->
@@ -108,7 +111,7 @@ class AppContextUtility(private val context: Context) {
                 """.trimIndent()
 
                 Log.d(TAG, "Sending request to Gemini API for instruction: $userInstruction")
-                
+
                 // Call Gemini API
                 val response = GeminiApi.generateContent(
                     prompt = prompt,
@@ -121,7 +124,7 @@ class AppContextUtility(private val context: Context) {
                 }
 
                 Log.d(TAG, "Gemini API response received: ${response.length} characters")
-                
+
                 // Clean up the response - remove any markdown formatting or extra text
                 val cleanedResponse = response.trim()
                     .removePrefix("```")
