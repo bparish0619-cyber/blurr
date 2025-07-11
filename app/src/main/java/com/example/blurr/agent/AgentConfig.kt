@@ -14,7 +14,8 @@ data class AgentConfig(
     val maxConsecutiveFailures: Int = 3,
     val maxRepetitiveActions: Int = 3,
     val errorThreshold: Int = 2,
-    val context: Context
+    val context: Context,
+    val enableDirectAppOpening: Boolean = false // Debug flag for direct app opening
 ) {
     val isXmlMode: Boolean
         get() = visionMode == VisionMode.XML
@@ -39,7 +40,8 @@ object AgentConfigFactory {
         maxIterations: Int = 200000,
         maxConsecutiveFailures: Int = 3,
         maxRepetitiveActions: Int = 3,
-        errorThreshold: Int = 2
+        errorThreshold: Int = 2,
+        enableDirectAppOpening: Boolean = false // Default to false for production safety
     ): AgentConfig {
         val mode = when (visionMode.uppercase()) {
             "XML" -> VisionMode.XML
@@ -54,7 +56,8 @@ object AgentConfigFactory {
             maxConsecutiveFailures = maxConsecutiveFailures,
             maxRepetitiveActions = maxRepetitiveActions,
             errorThreshold = errorThreshold,
-            context = context
+            context = context,
+            enableDirectAppOpening = enableDirectAppOpening
         )
     }
 } 

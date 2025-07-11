@@ -21,7 +21,8 @@ data class AtomicActionSignature(
     val description: (InfoPool) -> String
 )
 
-val atomicActionSignatures = mapOf(
+// Base atomic action signatures without Open_App
+val baseAtomicActionSignatures = mapOf(
     "Tap" to AtomicActionSignature(
         listOf("x", "y")
     ) { "Tap the position (x, y) in current screen." },
@@ -42,13 +43,25 @@ val atomicActionSignatures = mapOf(
 
     "Home" to AtomicActionSignature(emptyList()) { "Go to the home page." },
 
-    "Wait" to AtomicActionSignature(emptyList()) { "Wait for 10 seconds to give more time for a page loading" },
-
-//    "Open_App" to AtomicActionSignature(listOf("app_name")) { "If the current screen is Home or App screen, you can use this action to open the app named \\\"app_name\\\" on the visible on the current screen." }
+    "Wait" to AtomicActionSignature(emptyList()) { "Wait for 10 seconds to give more time for a page loading" }
 )
 
+// Function to get atomic action signatures based on configuration
+fun getAtomicActionSignatures(config: AgentConfig): Map<String, AtomicActionSignature> {
+    val signatures = baseAtomicActionSignatures.toMutableMap()
+    
+    // Add Open_App action only if direct app opening is enabled
+    if (config.enableDirectAppOpening) {
+        signatures["Open_App"] = AtomicActionSignature(
+            listOf("app_name")
+        ) { "Open the app named \"app_name\" directly using package manager. This is used to increase the speed of you performing the task." }
+    }
+    
+    return signatures
+}
 
-
+// Legacy atomicActionSignatures for backward compatibility (without Open_App)
+val atomicActionSignatures = baseAtomicActionSignatures
 
 class Operator(private val finger: Finger) : BaseAgent() {
 
@@ -132,17 +145,18 @@ class Operator(private val finger: Finger) : BaseAgent() {
 
         sb.appendLine("#### Atomic Actions ####")
         sb.appendLine("The atomic action functions are listed in the format of `name(arguments): description` as follows:\n")
-        val validActions = if (infoPool.keyboardPre) atomicActionSignatures else atomicActionSignatures.filterKeys { it != "Type" }
+        
+        // Get the appropriate atomic action signatures based on configuration
+        val validActions = getAtomicActionSignatures(config)
+        val filteredActions = if (infoPool.keyboardPre) validActions else validActions.filterKeys { it != "Type" }
 
-        validActions.forEach { (name, sig) ->
+        filteredActions.forEach { (name, sig) ->
             sb.appendLine("- $name(${sig.arguments.joinToString()}): ${sig.description(infoPool)}")
         }
 
         if (!infoPool.keyboardPre) {
             sb.appendLine("NOTE: Unable to type. The keyboard has not been activated. To type, please activate the keyboard by tapping on an input box first.\n")
-
         }
-
 
 
         sb.appendLine("### Latest Action History ###\n")
@@ -203,7 +217,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
         )
     }
 
-    fun executeAtomicAction(name: String, args: Map<*, *>, context: Context) {
+    fun executeAtomicAction(name: String, args: Map<*, *>, context: Context, config: AgentConfig? = null) {
 
         when (name.lowercase()) {
             "tap" -> finger.tap((args["x"] as Number).toInt(), (args["y"] as Number).toInt())
@@ -219,6 +233,26 @@ class Operator(private val finger: Finger) : BaseAgent() {
             "home" -> finger.home()
             "switch_app" -> finger.switchApp()
             "wait" -> Thread.sleep(10_000)
+            "open_app" -> {
+                if (config?.enableDirectAppOpening == true) {
+                    val appName = args["app_name"]?.toString()?.trim()
+                    if (appName != null) {
+                        val packageName = findPackageNameFromAppName(appName, context)
+                        if (packageName != null) {
+                            val success = finger.openApp(packageName)
+                            if (!success) {
+                                println("Failed to open app: $appName (package: $packageName)")
+                            }
+                        } else {
+                            println("Could not find package name for app: $appName")
+                        }
+                    } else {
+                        println("Missing app_name for Open_App action")
+                    }
+                } else {
+                    println("Open_App action is disabled")
+                }
+            }
             else -> println("Unsupported action: $name")
         }
 
@@ -233,13 +267,12 @@ class Operator(private val finger: Finger) : BaseAgent() {
         return text.substring(from, to).trim()
     }
 
-
-
     @RequiresApi(Build.VERSION_CODES.R)
     suspend fun execute(
         actionStr: String,
         infoPool: InfoPool,
         context: Context,
+        config: AgentConfig? = null
     ): Triple<Map<String, Any>?, Int, String?> {
 
         val actionObj = try {
@@ -269,28 +302,12 @@ class Operator(private val finger: Finger) : BaseAgent() {
         val name = (actionObj["name"] as String).trim()
         val arguments = actionObj["arguments"] as Map<*, *>
 
-        // Execute atomic action
-        if (atomicActionSignatures.containsKey(name)) {
-            if (name.equals("Open_App", ignoreCase = true)) {
-                val appName = arguments["app_name"]?.toString()?.trim() ?: return Triple(null, 0, "Missing app_name")
-                infoPool.perceptionInfosPre.forEach { clickableInfo ->
-                    if (clickableInfo.text.lowercase() == appName.lowercase()) {
-                        val tapArgs = mapOf(
-                            "x" to clickableInfo.coordinates.first,
-                            "y" to clickableInfo.coordinates.second
-                        )
-                        executeAtomicAction("Tap", tapArgs, context)
-//                        logActionOnScreenshot("Tap", tapArgs, context)
-                        return Triple(actionObj, 1, null)
-                }
-                    if (appName in listOf("Fandango", "Walmart", "Best Buy")) {
-                        Thread.sleep(10000)
-                    }
-                }
-                Thread.sleep(10000)
-            } else {
-                executeAtomicAction(name, arguments, context)
-            }
+        // Execute atomic action - use dynamic signatures that include Open_App when enabled
+        val currentConfig = config ?: AgentConfigFactory.create(context = context, visionMode = "XML", apiKey = "")
+        val validSignatures = getAtomicActionSignatures(currentConfig)
+        
+        if (validSignatures.containsKey(name)) {
+            executeAtomicAction(name, arguments, context, config)
             return Triple(actionObj, 1, null)
         }
         else {
@@ -306,4 +323,29 @@ class Operator(private val finger: Finger) : BaseAgent() {
         return Triple(null, 0, null)
     }
 
+    /**
+     * Helper function to find package name from app name
+     * This is a simple implementation - in a real scenario, you might want to use
+     * the AppContextUtility to get a more comprehensive list
+     */
+    private fun findPackageNameFromAppName(appName: String, context: Context): String? {
+        return try {
+            val packageManager = context.packageManager
+            val apps = packageManager.getInstalledApplications(android.content.pm.PackageManager.GET_META_DATA)
+            
+            // Try exact match first
+            apps.find { app ->
+                app.loadLabel(packageManager).toString().equals(appName, ignoreCase = true)
+            }?.packageName
+            
+            // If no exact match, try partial match
+            ?: apps.find { app ->
+                app.loadLabel(packageManager).toString().contains(appName, ignoreCase = true)
+            }?.packageName
+            
+        } catch (e: Exception) {
+            println("Error finding package name for app: $appName - ${e.message}")
+            null
+        }
+    }
 }

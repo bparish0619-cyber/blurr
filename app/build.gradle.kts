@@ -46,6 +46,9 @@ android {
             buildConfigField("String", "MEM0_API", "\"$mem0ApiKey\"")
             val picovoiceApiKey = localProperties.getProperty("PICOVOICE_ACCESS_KEY") ?: ""
             buildConfigField("String", "PICOVOICE_ACCESS_KEY", "\"$picovoiceApiKey\"")
+            
+            // Debug flag for direct app opening (set to false for production)
+            buildConfigField("boolean", "ENABLE_DIRECT_APP_OPENING", "true")
 
         }
         debug {
@@ -59,6 +62,9 @@ android {
             buildConfigField("String", "MEM0_API", "\"$mem0ApiKey\"")
             val picovoiceApiKey = localProperties.getProperty("PICOVOICE_ACCESS_KEY") ?: ""
             buildConfigField("String", "PICOVOICE_ACCESS_KEY", "\"$picovoiceApiKey\"")
+            
+            // Debug flag for direct app opening (set to true for debugging, false for production)
+            buildConfigField("boolean", "ENABLE_DIRECT_APP_OPENING", "true")
         }
     }
     compileOptions {
