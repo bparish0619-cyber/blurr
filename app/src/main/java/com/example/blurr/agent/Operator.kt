@@ -47,7 +47,11 @@ val baseAtomicActionSignatures = mapOf(
 
     "Speak" to AtomicActionSignature(
         listOf("message")
-    ) { "Speak the \"message\" to the user. Use this when you need to communicate important information, ask for clarification, provide status updates, or give instructions to the user. This message will be spoken on loud speaker, so dont say private information." }
+    ) { "Speak the \"message\" to the user. Use this when you need to communicate important information, provide status updates, or give instructions to the user. This message will be spoken on loud speaker, so dont say private information." },
+
+    "Ask" to AtomicActionSignature(
+        listOf("question")
+    ) { "Ask the \"question\" to the user and wait for their response. Use this when you need clarification, more information, or user input to proceed with the task. The user's response will be added to the instruction to help you complete the task." }
 )
 
 // Function to get atomic action signatures based on configuration
@@ -221,7 +225,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
         )
     }
 
-    fun executeAtomicAction(name: String, args: Map<*, *>, context: Context, config: AgentConfig? = null) {
+    suspend fun executeAtomicAction(name: String, args: Map<*, *>, context: Context, infoPool: InfoPool, config: AgentConfig? = null) {
 
         when (name.lowercase()) {
             "tap" -> finger.tap((args["x"] as Number).toInt(), (args["y"] as Number).toInt())
@@ -247,6 +251,29 @@ class Operator(private val finger: Finger) : BaseAgent() {
                     }
                 } else {
                     println("Missing message for Speak action")
+                }
+            }
+            "ask" -> {
+                val question = args["question"]?.toString()?.trim()
+                if (question != null) {
+                    // Use speakToUser to ask the question
+                    kotlinx.coroutines.runBlocking {
+                        val ttsManager = com.example.blurr.utilities.TTSManager.getInstance(context)
+                        ttsManager.speakToUser(question)
+                    }
+                    
+                    // Get user response using UserInputManager
+                    val userInputManager = com.example.blurr.utilities.UserInputManager(context)
+                    val userResponse = userInputManager.askQuestion(question)
+                    
+                    // Update the instruction with the user's response
+                    val updatedInstruction = "${infoPool.instruction}\n\n[Agent asked: $question]\n[User responded: $userResponse]"
+                    infoPool.instruction = updatedInstruction
+                    
+                    println("Agent asked: $question")
+                    println("User responded: $userResponse")
+                } else {
+                    println("Missing question for Ask action")
                 }
             }
             "open_app" -> {
@@ -323,7 +350,7 @@ class Operator(private val finger: Finger) : BaseAgent() {
         val validSignatures = getAtomicActionSignatures(currentConfig)
         
         if (validSignatures.containsKey(name)) {
-            executeAtomicAction(name, arguments, context, config)
+            executeAtomicAction(name, arguments, context, infoPool, config)
             return Triple(actionObj, 1, null)
         }
         else {

@@ -70,6 +70,17 @@ The agent can also use the `Speak` action to communicate with the user:
 }
 ```
 
+And the `Ask` action to get user input:
+
+```json
+{
+    "name": "Ask",
+    "arguments": {
+        "question": "I found multiple apps with similar names. Which one do you want me to open?"
+    }
+}
+```
+
 ## Implementation Details
 
 ### 1. AgentConfig Changes
@@ -101,7 +112,15 @@ The `Speak` action is always available and allows the agent to communicate with 
 ```kotlin
 "Speak" to AtomicActionSignature(
     listOf("message")
-) { "Speak the \"message\" to the user. Use this when you need to communicate important information, ask for clarification, provide status updates, or give instructions to the user. This message will always be spoken regardless of debug settings." }
+) { "Speak the \"message\" to the user. Use this when you need to communicate important information, provide status updates, or give instructions to the user. This message will be spoken on loud speaker, so dont say private information." }
+```
+
+The `Ask` action is always available and allows the agent to get user input:
+
+```kotlin
+"Ask" to AtomicActionSignature(
+    listOf("question")
+) { "Ask the \"question\" to the user and wait for their response. Use this when you need clarification, more information, or user input to proceed with the task. The user's response will be added to the instruction to help you complete the task." }
 ```
 
 ## Behavior
@@ -117,6 +136,8 @@ When the flag is disabled:
 
 The `Speak` action is always available regardless of any flags and allows the agent to communicate directly with the user.
 
+The `Ask` action is always available and allows the agent to get user input and update the instruction accordingly.
+
 ## Error Handling
 
 When the Open_App action is used:
@@ -131,6 +152,12 @@ When the Open_App action is disabled:
 When the Speak action is used:
 - Missing message: Prints "Missing message for Speak action"
 - Message will always be spoken using `speakToUser()` regardless of debug settings
+
+When the Ask action is used:
+- Missing question: Prints "Missing question for Ask action"
+- Question will be spoken using `speakToUser()`
+- User response will be captured and added to the instruction
+- Instruction will be updated with both the question and response
 
 ## Security Considerations
 

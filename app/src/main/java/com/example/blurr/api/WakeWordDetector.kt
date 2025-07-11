@@ -12,7 +12,7 @@ class WakeWordDetector(
     private val context: Context,
     private val onWakeWordDetected: () -> Unit
 ) {
-    private val sttManager = STTManager(context)
+    private var sttManager: STTManager? = null
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val wakeWord = "Panda"
     private var isListening = false
@@ -36,8 +36,8 @@ class WakeWordDetector(
         }
         isListening = false
         handler.removeCallbacksAndMessages(null)
-        sttManager.stopListening()
-        sttManager.shutdown()
+        sttManager?.stopListening()
+        sttManager?.shutdown()
 
         // Ensure the sound is unmuted when the service is stopped
         audioManager.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, AudioManager.ADJUST_UNMUTE, 0)
@@ -47,10 +47,15 @@ class WakeWordDetector(
     private fun startContinuousListening() {
         if (!isListening) return
 
+        // Initialize STT manager if needed
+        if (sttManager == null) {
+            sttManager = STTManager(context)
+        }
+
         // Mute the notification stream to prevent the startup chime
         audioManager.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, AudioManager.ADJUST_MUTE, 0)
 
-        sttManager.startListening(
+        sttManager?.startListening(
             onResult = { recognizedText ->
                 Log.d("WakeWordDetector", "Recognized: '$recognizedText'")
                 if (recognizedText.lowercase(Locale.ROOT).contains(wakeWord.lowercase(Locale.ROOT))) {
@@ -74,7 +79,7 @@ class WakeWordDetector(
     private fun restartListening() {
         if (!isListening) return
         handler.postDelayed({
-            sttManager.stopListening()
+            sttManager?.stopListening()
             startContinuousListening()
         }, restartDelayMs)
     }
