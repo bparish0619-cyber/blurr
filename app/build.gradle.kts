@@ -26,6 +26,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    val debugSha1 = "D0:A1:49:03:FD:B5:37:DF:B5:36:51:B1:66:AE:70:11:E2:59:08:33"
 
     buildTypes {
         release {
@@ -51,6 +52,9 @@ android {
             buildConfigField("boolean", "ENABLE_DIRECT_APP_OPENING", "true")
             buildConfigField("boolean", "SPEAK_INSTRUCTIONS", "true")
 
+            val googleTtsApiKey = localProperties.getProperty("GOOGLE_TTS_API_KEY") ?: ""
+            buildConfigField("String", "GOOGLE_TTS_API_KEY", "\"$googleTtsApiKey\"")
+
         }
         debug {
             // Also add it to the 'debug' block so it works when you run from Android Studio
@@ -67,6 +71,10 @@ android {
             // Debug flag for direct app opening (set to true for debugging, false for production)
             buildConfigField("boolean", "ENABLE_DIRECT_APP_OPENING", "true")
             buildConfigField("boolean", "SPEAK_INSTRUCTIONS", "true")
+            val googleTtsApiKey = localProperties.getProperty("GOOGLE_TTS_API_KEY") ?: ""
+            buildConfigField("String", "GOOGLE_TTS_API_KEY", "\"$googleTtsApiKey\"")
+            buildConfigField("String", "SHA1_FINGERPRINT", "\"$debugSha1\"")
+
         }
     }
     compileOptions {

@@ -40,4 +40,22 @@
     <string name="wake_word_enabled">Wake Word enabled with %s</string>
     <string name="wake_word_disabled">Wake Word disabled</string>
     <string name="porcupine_access_key_required">Porcupine Access Key required</string>
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="tts_voice_settings">TTS Voice Settings</string>
+    <string name="select_default_tts_voice">Select your preferred default voice for text-to-speech</string>
+    <string name="standard_male_voice">Standard Male Voice</string>
+    <string name="standard_male_description">Clear, professional male voice</string>
+    <string name="standard_female_voice">Standard Female Voice</string>
+    <string name="standard_female_description">Clear, professional female voice</string>
+    <string name="neural_male_voice">Neural Male Voice</string>
+    <string name="neural_male_description">Natural-sounding male voice with neural technology</string>
+    <string name="neural_female_voice">Neural Female Voice</string>
+    <string name="neural_female_description">Natural-sounding female voice with neural technology</string>
+    <string name="studio_male_voice">Studio Male Voice</string>
+    <string name="studio_male_description">High-quality studio male voice</string>
+    <string name="test_selected_voice">Test Selected Voice</string>
+    <string name="save_settings">Save Settings</string>
+    <string name="settings_saved">Settings saved successfully</string>
+    <string name="testing_voice">Testing voice...</string>
 </resources>

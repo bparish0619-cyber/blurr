@@ -59,6 +59,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var wakeWordEngineGroup: RadioGroup
     private lateinit var sttEngineRadio: RadioButton
     private lateinit var porcupineEngineRadio: RadioButton
+    private lateinit var settingsButton: ImageButton
 
     private lateinit var ttsManager: TTSManager
     private lateinit var sttManager: STTManager
@@ -121,6 +122,7 @@ class MainActivity : AppCompatActivity() {
         wakeWordEngineGroup = findViewById(R.id.wakeWordEngineGroup)
         sttEngineRadio = findViewById(R.id.sttEngineRadio)
         porcupineEngineRadio = findViewById(R.id.porcupineEngineRadio)
+        settingsButton = findViewById(R.id.settingsButton)
 
         grantPermission.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
@@ -135,6 +137,7 @@ class MainActivity : AppCompatActivity() {
         setupClickListeners()
         setupVisionModeListener()
         setupVoiceInput()
+        setupSettingsButton()
         handler = Handler(Looper.getMainLooper())
 
 
@@ -301,6 +304,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupSettingsButton() {
+        settingsButton.setOnClickListener {
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
+        }
+    }
+
     private fun startVoiceInput() {
         voiceStatusText.text = getString(R.string.listening)
         voiceInputButton.isPressed = true
@@ -424,8 +434,6 @@ class MainActivity : AppCompatActivity() {
                      Log.d("MainActivity", "This is a UI Task. Starting AgentTaskService.")
                      statusText.text = "Agent started to perform task..."
 
-                     // Announce the agent task
-                     ttsManager.speakText("Starting agent task for: $instruction")
 
                      // Determine vision mode based on radio button selection
                      val visionMode = if (xmlModeRadio.isChecked) VisionMode.XML.name else VisionMode.SCREENSHOT.name
