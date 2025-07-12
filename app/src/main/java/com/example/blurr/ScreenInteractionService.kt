@@ -108,6 +108,15 @@ class ScreenInteractionService : AccessibilityService() {
         setupAudioWaveEffect()
 //        setupWaveBorderEffect()
     }
+    /**
+     * Gets the package name of the app currently in the foreground.
+     * @return The package name as a String, or null if not available.
+     */
+    fun getForegroundAppPackageName(): String? {
+        // The rootInActiveWindow property holds the node info for the current screen,
+        // which includes the package name.
+        return rootInActiveWindow?.packageName?.toString()
+    }
 
 
 // In ScreenInteractionService.kt
