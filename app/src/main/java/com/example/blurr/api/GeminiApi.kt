@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.util.Base64
 import android.util.Log
+import com.google.ai.client.generativeai.type.ImagePart
+import com.google.ai.client.generativeai.type.TextPart
 import kotlinx.coroutines.delay
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -31,7 +33,7 @@ object GeminiApi {
         .build()
 
     suspend fun generateContent(
-        prompt: String,
+        chat: List<Pair<String, List<Any>>>, // <-- Pass the whole chat
         images: List<Bitmap> = emptyList(),
         modelName: String = "gemini-2.5-flash",
         maxRetry: Int = 4,
@@ -45,14 +47,12 @@ object GeminiApi {
         while (attempts < maxRetry) {
             val attemptStartTime = System.currentTimeMillis()
             try {
-                val payload = buildPayload(prompt, images)
+                val payload = buildPayload(chat) // <-- Change this call
                 
                 // Log the request details
                 Log.d("GeminiApi", "=== GEMINI API REQUEST (Attempt ${attempts + 1}) ===")
                 Log.d("GeminiApi", "Model: $modelName")
                 Log.d("GeminiApi", "Images count: ${images.size}")
-                Log.d("GeminiApi", "Prompt length: ${prompt.length} characters")
-                Log.d("GeminiApi", "Prompt preview: ${prompt.take(200)}${if (prompt.length > 200) "..." else ""}")
                 
                 // Log full payload for debugging (be careful with sensitive data)
                 Log.d("GeminiApi", "Full payload: ${payload.toString()}")
@@ -101,7 +101,7 @@ object GeminiApi {
                         val logEntry = createLogEntry(
                             attempts + 1,
                             modelName,
-                            prompt,
+                            "dssss",
                             images.size,
                             payload.toString(),
                             response.code,
@@ -128,7 +128,7 @@ object GeminiApi {
                     val logEntry = createLogEntry(
                         attempts + 1,
                         modelName,
-                        prompt,
+                        "prompt",
                         images.size,
                         "",
                         500,
@@ -154,23 +154,47 @@ object GeminiApi {
         return null
     }
 
-    // buildPayload and parseSuccessResponse methods remain the same, just remove the 'model' parameter from buildPayload
-    private fun buildPayload(prompt: String, images: List<Bitmap>): JSONObject {
-        // ... same implementation as before
-        val jsonParts = JSONArray()
-        jsonParts.put(JSONObject().put("text", prompt))
-        images.forEach { bitmap ->
-            val stream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
-            val base64Image = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
-            val imagePart = JSONObject().put("inline_data", JSONObject()
-                .put("mime_type", "image/jpeg")
-                .put("data", base64Image)
-            )
-            jsonParts.put(imagePart)
+// In GeminiApi.kt
+
+    // DELETE the old buildPayload and REPLACE it with this:
+    private fun buildPayload(chat: List<Pair<String, List<Any>>>): JSONObject {
+        val contentsArray = JSONArray()
+        chat.forEach { (role, parts) ->
+            Log.d("GeminiApi", "$role $parts")
+
         }
-        val contents = JSONObject().put("role", "user").put("parts", jsonParts)
-        return JSONObject().put("contents", JSONArray().put(contents))
+        // Loop through the entire conversation history
+        chat.forEach { (role, parts) ->
+            val jsonParts = JSONArray()
+
+            // Handle text and image parts for each role
+            parts.forEach { part ->
+                when (part) {
+                    is TextPart -> {
+                        jsonParts.put(JSONObject().put("text", part.text))
+                    }
+                    is ImagePart -> {
+                        val stream = ByteArrayOutputStream()
+                        part.image.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+                        val base64Image = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+                        val imagePart = JSONObject().put("inline_data", JSONObject()
+                            .put("mime_type", "image/jpeg")
+                            .put("data", base64Image)
+                        )
+                        jsonParts.put(imagePart)
+                    }
+                }
+            }
+
+            // Create a content object for the current role and its parts
+            val contentObject = JSONObject()
+                .put("role", role)
+                .put("parts", jsonParts)
+
+            contentsArray.put(contentObject)
+        }
+
+        return JSONObject().put("contents", contentsArray)
     }
 
     private fun parseSuccessResponse(responseBody: String): String? {
