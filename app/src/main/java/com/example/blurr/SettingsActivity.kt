@@ -105,10 +105,6 @@ class SettingsActivity : AppCompatActivity() {
 
         saveButton.setOnClickListener { saveSelectedVoice() }
 
-        permissionsInfoButton.setOnClickListener {
-            val intent = Intent(this, PermissionsActivity::class.java)
-            startActivity(intent)
-        }
     }
 
     /**

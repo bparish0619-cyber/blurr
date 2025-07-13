@@ -18,6 +18,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.json.JSONException
+import org.json.JSONObject
 
 class ConversationalAgentService : Service() {
 
@@ -81,12 +83,13 @@ class ConversationalAgentService : Service() {
             }
         )
     }
-
+    // --- CHANGED: Rewritten to process structured JSON from the model ---
     private fun processUserInput(userInput: String) {
         serviceScope.launch {
             conversationHistory = addResponse("user", userInput, conversationHistory)
 
             try {
+                // Hardcoded exit command for the user remains as a fallback
                 if (userInput.equals("stop", ignoreCase = true) || userInput.equals("exit", ignoreCase = true)) {
                     speakAndThenListen("Goodbye!")
                     delay(2000)
@@ -94,16 +97,24 @@ class ConversationalAgentService : Service() {
                     return@launch
                 }
 
-                // Call the API with the conversation history
-                val response = getReasoningModelApiResponse(conversationHistory, "")
+                // Get the raw JSON string from the API
+                val rawModelResponse = getReasoningModelApiResponse(conversationHistory, "") ?: """{"reply": "I'm sorry, I'm having trouble thinking right now.", "shouldEndConversation": false}"""
 
-                // FIXED: Correctly extract the text from the Gemini API response.
-                // Calling .toString() on the response object was causing the error.
-                // The .text property contains the model's actual reply.
-                val modelResponse = response ?: "Sorry, I had trouble understanding. Could you repeat that?"
+                // Parse the structured response
+                val (reply, shouldEnd) = parseModelResponse(rawModelResponse)
 
-                conversationHistory = addResponse("model", modelResponse, conversationHistory)
-                speakAndThenListen(modelResponse)
+                if (shouldEnd) {
+                    Log.d("ConvAgent", "Model decided to end the conversation.")
+                    // Speak the final reply without listening again
+                    speechCoordinator.speakText(reply)
+                    // Wait for speech to finish (adjust delay as needed or use a proper callback)
+                    delay(2000)
+                    stopSelf() // Stop the service
+                } else {
+                    // Continue the conversation
+                    conversationHistory = addResponse("model", rawModelResponse, conversationHistory)
+                    speakAndThenListen(reply)
+                }
 
             } catch (e: Exception) {
                 Log.e("ConvAgent", "Error processing user input: ${e.message}", e)
@@ -112,10 +123,50 @@ class ConversationalAgentService : Service() {
         }
     }
 
+//    private fun processUserInput(userInput: String) {
+//        serviceScope.launch {
+//            conversationHistory = addResponse("user", userInput, conversationHistory)
+//
+//            try {
+//                if (userInput.equals("stop", ignoreCase = true) || userInput.equals("exit", ignoreCase = true)) {
+//                    speakAndThenListen("Goodbye!")
+//                    delay(2000)
+//                    stopSelf()
+//                    return@launch
+//                }
+//
+//                // Call the API with the conversation history
+//                val response = getReasoningModelApiResponse(conversationHistory, "")
+//
+//                // FIXED: Correctly extract the text from the Gemini API response.
+//                // Calling .toString() on the response object was causing the error.
+//                // The .text property contains the model's actual reply.
+//                val modelResponse = response ?: "Sorry, I had trouble understanding. Could you repeat that?"
+//
+//                conversationHistory = addResponse("model", modelResponse, conversationHistory)
+//                speakAndThenListen(modelResponse)
+//
+//            } catch (e: Exception) {
+//                Log.e("ConvAgent", "Error processing user input: ${e.message}", e)
+//                speakAndThenListen("I encountered an error. Let's try again.")
+//            }
+//        }
+//    }
+
     private fun initializeConversation() {
         val systemPrompt = """
             You are a friendly and helpful voice assistant. Your goal is to have a natural conversation with the user.
-            - Try to keep the user happy
+            ALWAYS respond in a JSON format with two keys: "reply" and "shouldEndConversation".
+            - "reply": Your text response to the user. Keep it conversational.
+            - "shouldEndConversation": A boolean (true or false). Set it to true ONLY when the conversation is clearly over (e.g., the user says "goodbye", "thank you, that's all", etc.). Otherwise, it must be false.
+
+            Example 1:
+            User: "What's the weather like today?"
+            You: {"reply": "It looks like a sunny day in Ghaziabad, with a high of 35 degrees Celsius.", "shouldEndConversation": false}
+
+            Example 2:
+            User: "Okay, thanks, goodbye!"
+            You: {"reply": "You're welcome! Goodbye!", "shouldEndConversation": true}
         """.trimIndent()
 
         conversationHistory = addResponse("user", systemPrompt, emptyList())
@@ -144,6 +195,20 @@ class ConversationalAgentService : Service() {
             manager?.createNotificationChannel(serviceChannel)
         }
     }
+    // --- NEW: Helper function to parse the model's JSON response safely ---
+    private fun parseModelResponse(jsonString: String): Pair<String, Boolean> {
+        return try {
+            val jsonObject = JSONObject(jsonString)
+            val reply = jsonObject.getString("reply")
+            val shouldEnd = jsonObject.optBoolean("shouldEndConversation", false)
+            Pair(reply, shouldEnd)
+        } catch (e: JSONException) {
+            Log.e("ConvAgent", "Failed to parse JSON from model: $jsonString")
+            // If parsing fails, use the whole string as the reply and don't end the conversation
+            Pair(jsonString, false)
+        }
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()
