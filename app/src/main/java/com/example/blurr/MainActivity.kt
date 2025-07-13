@@ -38,6 +38,7 @@ import com.example.blurr.services.AgentTaskService
 import com.example.blurr.services.WakeWordService
 import com.example.blurr.services.EnhancedWakeWordService
 import com.example.blurr.utilities.getReasoningModelApiResponse
+import android.view.View
 
 class MainActivity : AppCompatActivity() {
 
@@ -517,8 +518,17 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetTextI18n")
     private fun updateUI() {
         val isPermissionGranted = isAccessibilityServiceEnabled()
-        tvPermissionStatus.text = if (isPermissionGranted) "Permission: Granted" else "Permission: Not Granted"
-        tvPermissionStatus.setTextColor(if (isPermissionGranted) Color.GREEN else Color.RED)
+        if (isPermissionGranted) {
+            // If permission is granted, hide the button and the status text.
+            tvPermissionStatus.visibility = View.GONE
+            grantPermission.visibility = View.GONE
+        } else {
+            // If permission is NOT granted, show the button and the status text.
+            tvPermissionStatus.visibility = View.VISIBLE
+            grantPermission.visibility = View.VISIBLE
+            tvPermissionStatus.text = "Permission: Not Granted"
+            tvPermissionStatus.setTextColor(Color.RED)
+        }
 
         val serviceRunning = EnhancedWakeWordService.isRunning
         if (serviceRunning) {
