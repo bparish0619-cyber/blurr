@@ -116,7 +116,10 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
     suspend fun speakToUser(text: String) {
         speak(text)
     }
-
+    // Add this new function inside your TTSManager class
+    fun getAudioSessionId(): Int {
+        return audioTrack?.audioSessionId ?: 0
+    }
     private suspend fun speak(text: String) {
         try {
             // --- PRIMARY METHOD: GOOGLE CLOUD TTS ---

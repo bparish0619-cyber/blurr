@@ -23,59 +23,59 @@ class DeepSearch {
      * @param instruction The user's raw voice or text command.
      * @return The final, synthesized answer, or an error message.
      */
-    suspend fun execute(instruction: String): String {
-        return withContext(Dispatchers.IO) {
-            try {
-                // STEP 1: PRE-SEARCH ANALYSIS (LLM Call #1)
-                // Ask Gemini to determine the best way to search for this query.
-                Log.d("DeepSearch", "Step 1: Performing Pre-Search Analysis for: '$instruction'")
-                val searchStrategyJson = geminiApi.generateContent(
-                    prompt = getPreSearchAnalysisPrompt(instruction),
-                    modelName = "gemini-1.5-flash-latest" // Good for structured JSON output
-                )
-
-                if (searchStrategyJson == null) {
-                    Log.e("DeepSearch", "Pre-search analysis failed to return a strategy.")
-                    return@withContext "I couldn't figure out how to search for that."
-                }
-
-                val sanitizedJson = searchStrategyJson
-                    .replace("```json", "")
-                    .replace("```", "")
-                    .trim()
-
-                val searchParams = JSONObject(sanitizedJson)
-
-                val isSearchNeeded = searchParams.optBoolean("is_search_needed", false)
-
-                // If the LLM decides no search is needed, return its reasoning.
-                if (!isSearchNeeded) {
-
-                    return@withContext "NO-SEARCH"
-                }
-
-
-                // STEP 2: ADVANCED TAVILY SEARCH
-                // Execute the search using the optimized parameters from the LLM.
-                Log.d("DeepSearch", "Step 2: Executing Advanced Search with parameters: $searchParams")
-                val tavilyJsonResult = tavilyApi.search(searchParams)
-
-
-                // STEP 3: FINAL SUMMARIZATION (LLM Call #2)
-                // Feed the rich results back to Gemini to get a final answer.
-                Log.d("DeepSearch", "Step 3: Summarizing search results.")
-                val finalAnswer = geminiApi.generateContent(
-                    prompt = getSummarizationPrompt(instruction, tavilyJsonResult)
-                )
-
-                finalAnswer ?: "I found some information but had trouble summarizing it."
-
-            } catch (e: Exception) {
-                Log.e("DeepSearch", "Deep search execution failed", e)
-                "I'm sorry, I encountered an error while trying to find information."
-            }
-        }
-    }
+//    suspend fun execute(instruction: String): String {
+//        return withContext(Dispatchers.IO) {
+//            try {
+//                // STEP 1: PRE-SEARCH ANALYSIS (LLM Call #1)
+//                // Ask Gemini to determine the best way to search for this query.
+//                Log.d("DeepSearch", "Step 1: Performing Pre-Search Analysis for: '$instruction'")
+//                val searchStrategyJson = geminiApi.generateContent(
+//                    prompt = getPreSearchAnalysisPrompt(instruction),
+//                    modelName = "gemini-1.5-flash-latest" // Good for structured JSON output
+//                )
+//
+//                if (searchStrategyJson == null) {
+//                    Log.e("DeepSearch", "Pre-search analysis failed to return a strategy.")
+//                    return@withContext "I couldn't figure out how to search for that."
+//                }
+//
+//                val sanitizedJson = searchStrategyJson
+//                    .replace("```json", "")
+//                    .replace("```", "")
+//                    .trim()
+//
+//                val searchParams = JSONObject(sanitizedJson)
+//
+//                val isSearchNeeded = searchParams.optBoolean("is_search_needed", false)
+//
+//                // If the LLM decides no search is needed, return its reasoning.
+//                if (!isSearchNeeded) {
+//
+//                    return@withContext "NO-SEARCH"
+//                }
+//
+//
+//                // STEP 2: ADVANCED TAVILY SEARCH
+//                // Execute the search using the optimized parameters from the LLM.
+//                Log.d("DeepSearch", "Step 2: Executing Advanced Search with parameters: $searchParams")
+//                val tavilyJsonResult = tavilyApi.search(searchParams)
+//
+//
+//                // STEP 3: FINAL SUMMARIZATION (LLM Call #2)
+//                // Feed the rich results back to Gemini to get a final answer.
+//                Log.d("DeepSearch", "Step 3: Summarizing search results.")
+//                val finalAnswer = geminiApi.generateContent(
+//                    prompt = getSummarizationPrompt(instruction, tavilyJsonResult)
+//                )
+//
+//                finalAnswer ?: "I found some information but had trouble summarizing it."
+//
+//            } catch (e: Exception) {
+//                Log.e("DeepSearch", "Deep search execution failed", e)
+//                "I'm sorry, I encountered an error while trying to find information."
+//            }
+//        }
+//    }
 
     /**
      * Creates the prompt that asks the LLM to act as a research strategist.

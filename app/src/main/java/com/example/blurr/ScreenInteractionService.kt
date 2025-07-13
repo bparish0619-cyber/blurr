@@ -839,27 +839,42 @@ class ScreenInteractionService : AccessibilityService() {
     /**
      * Connects the TTS speaking state to the wave view for smooth animations.
      */
+
+    // --- REPLACED with the new reactive implementation ---
+    /**
+     * Connects the TTS audio output to the wave view for real-time visualization.
+     */
     private fun setupAudioWaveEffect() {
         showAudioWave()
         val ttsManager = TTSManager.getInstance(this) ?: return
+        val audioSessionId = ttsManager.getAudioSessionId()
 
-        // Set the initial amplitude to idle (0.0f)
-        audioWaveView?.setTargetAmplitude(0.0f)
+        if (audioSessionId == 0) {
+            Log.e("InteractionService", "Failed to get valid audio session ID. Visualizer not started.")
+            return
+        }
 
-        // This listener will now trigger the smooth animations
+        // Create the visualizer and link it to the AudioWaveView
+        ttsVisualizer = TtsVisualizer(audioSessionId) { normalizedAmplitude ->
+            Handler(Looper.getMainLooper()).post {
+                audioWaveView?.setRealtimeAmplitude(normalizedAmplitude)
+            }
+        }
+
+        // Use the utterance listener to start and stop the visualizer
         ttsManager.utteranceListener = { isSpeaking ->
-            // Ensure UI calls are on the main thread
             Handler(Looper.getMainLooper()).post {
                 if (isSpeaking) {
-                    // Animate to full amplitude
-                    audioWaveView?.setTargetAmplitude(1.0f)
+                    audioWaveView?.setTargetAmplitude(0.2f)
+                    ttsVisualizer?.start()
                 } else {
-                    // Animate back down to idle amplitude
+                    ttsVisualizer?.stop()
                     audioWaveView?.setTargetAmplitude(0.0f)
                 }
             }
         }
     }
+
 
 }
 
