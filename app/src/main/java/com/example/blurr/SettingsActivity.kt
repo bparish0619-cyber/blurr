@@ -17,14 +17,17 @@ import com.example.blurr.utilities.SpeechCoordinator
 import com.example.blurr.utilities.TTSManager
 import kotlinx.coroutines.launch
 import androidx.core.content.edit
+import android.content.Intent
+import android.widget.Button
 
 class SettingsActivity : AppCompatActivity() {
 
     // --- UI Views ---
     private lateinit var ttsVoiceSpinner: Spinner
-    private lateinit var testVoiceButton: TextView
-    private lateinit var saveButton: TextView
-    private lateinit var backButton: TextView
+    private lateinit var testVoiceButton: Button // Changed from TextView
+    private lateinit var saveButton: Button    // Changed from TextView
+    private lateinit var backButton: Button      // Changed from TextView
+    private lateinit var permissionsInfoButton: TextView // This one stays as TextView
 
     // --- Utilities & Data ---
     private lateinit var sc: SpeechCoordinator
@@ -66,6 +69,8 @@ class SettingsActivity : AppCompatActivity() {
         testVoiceButton = findViewById(R.id.testVoiceButton)
         saveButton = findViewById(R.id.saveButton)
         backButton = findViewById(R.id.backButton)
+        permissionsInfoButton = findViewById(R.id.permissionsInfoButton)
+
 
         // Populate the spinner with voice options
         setupSpinner()
@@ -99,6 +104,11 @@ class SettingsActivity : AppCompatActivity() {
         testVoiceButton.setOnClickListener { testSelectedVoice() }
 
         saveButton.setOnClickListener { saveSelectedVoice() }
+
+        permissionsInfoButton.setOnClickListener {
+            val intent = Intent(this, PermissionsActivity::class.java)
+            startActivity(intent)
+        }
     }
 
     /**

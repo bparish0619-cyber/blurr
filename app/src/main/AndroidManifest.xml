@@ -54,6 +54,14 @@
             android:label="@string/settings"
             android:theme="@style/Theme.Blurr">
         </activity>
+        
+
+        <activity
+            android:name=".PermissionsActivity"
+            android:exported="false"
+            android:label="@string/permissions_explained_title"
+            android:theme="@style/Theme.Blurr">
+        </activity>
         <!-- The Accessibility Service declaration -->
         <service
             android:name=".ScreenInteractionService"
