@@ -124,6 +124,17 @@ class ContentModerationService : Service() {
     private suspend fun contentModeration(inst: String) {
         Log.d("ModerationService", "contentModeration function started")
         val startTime = System.currentTimeMillis()
+        // Check if the current foreground app is our own app.
+        val foregroundApp = ScreenInteractionService.instance?.getForegroundAppPackageName()
+        val myAppPackageName = applicationContext.packageName // This will be "com.example.blurr"
+
+        if (foregroundApp == myAppPackageName) {
+            Log.d("ModerationService", "Inside our own app ($myAppPackageName). Skipping moderation.")
+            // If we are inside our own app, don't do anything.
+            // Just reschedule the next check and exit the function early.
+            handler.postDelayed(moderationRunnable, 8000)
+            return
+        }
         try {
             var screenshotBitmap = eyes.openEyes()
             val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
