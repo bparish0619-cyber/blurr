@@ -39,7 +39,6 @@ class DeepSearch {
                     return@withContext "I couldn't figure out how to search for that."
                 }
 
-                println(searchStrategyJson)
                 val sanitizedJson = searchStrategyJson
                     .replace("```json", "")
                     .replace("```", "")

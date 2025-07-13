@@ -131,7 +131,6 @@ class SettingsActivity : AppCompatActivity() {
     private fun testSelectedVoice() {
         val selectedVoice = getSelectedVoice()
         saveSelectedVoice()
-        println("ssssssssssssssssss $selectedVoice")
         testVoiceButton.isEnabled = false
         testVoiceButton.text = "Testing..." // Use string resource for better practice
 
@@ -155,7 +154,6 @@ class SettingsActivity : AppCompatActivity() {
      */
     private fun saveSelectedVoice() {
         val selectedVoice = getSelectedVoice()
-        println("cccccccccccccccc $selectedVoice")
         sharedPreferences.edit {
             putString(KEY_SELECTED_VOICE, selectedVoice.name)
         }

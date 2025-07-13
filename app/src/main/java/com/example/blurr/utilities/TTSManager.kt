@@ -124,7 +124,6 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
             
             // Get the selected voice from preferences
             val selectedVoice = VoicePreferenceManager.getSelectedVoice(context)
-            println("aaaaaaaaaaaaaaaaaa $selectedVoice")
             val audioData = GoogleTts.synthesize(text, selectedVoice)
 
             // This deferred will complete when onMarkerReached is called.

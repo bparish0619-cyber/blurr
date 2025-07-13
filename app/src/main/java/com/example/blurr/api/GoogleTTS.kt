@@ -73,7 +73,6 @@ object GoogleTts {
         if (apiKey.isEmpty()) {
             throw Exception("Google TTS API key is not configured.")
         }
-        println("ddddddddddddddddddddddddddddddd")
         println(voice.displayName)
 
         // 1. Construct the JSON payload

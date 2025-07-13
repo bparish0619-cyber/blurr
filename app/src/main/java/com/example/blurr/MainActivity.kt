@@ -371,7 +371,6 @@ class MainActivity : AppCompatActivity() {
         try {
             // Create a temporary InfoPool for the clarification agent
             val tempInfoPool = InfoPool(instruction = instruction)
-            println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
             // Get clarification response
             val config = AgentConfig(visionMode = VisionMode.XML, apiKey = "", context = this)
             val prompt = clarificationAgent.getPrompt(tempInfoPool, config)
@@ -390,7 +389,6 @@ class MainActivity : AppCompatActivity() {
             println(parsedResult)
             val status = parsedResult["status"] ?: "CLEAR"
             val questionsText = parsedResult["questions"] ?: ""
-            println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
             return if (status == "NEEDS_CLARIFICATION" && questionsText.isNotEmpty()) {
                 val questions = clarificationAgent.parseQuestions(questionsText)
@@ -447,7 +445,6 @@ class MainActivity : AppCompatActivity() {
                      val fin = Finger(this@MainActivity)
                      fin.home()
                 // } else {
-//                    println("Final Answer: $finalAnswer")
 //                    Log.d("MainActivity", "Deep Search complete. Answer: $finalAnswer")
 //                    statusText.text = finalAnswer
 //                    ttsManager.speakText(finalAnswer)

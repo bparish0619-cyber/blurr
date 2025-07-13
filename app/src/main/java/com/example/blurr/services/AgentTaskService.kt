@@ -409,7 +409,6 @@ class AgentTaskService : Service() {
                 var actionThought = parsedAction["thought"]
                 var actionObjStr = parsedAction["action"]
                 var actionDesc = parsedAction["description"]
-                println("@@@@@@@@@@@@@@@@@")
                 println(parsedAction)
                 val actionThinkingTimeEnd = System.currentTimeMillis()
 

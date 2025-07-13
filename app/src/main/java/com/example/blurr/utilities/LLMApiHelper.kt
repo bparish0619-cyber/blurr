@@ -99,7 +99,6 @@ suspend fun inferenceChat(
 
     for ((role, parts) in chat) {
         if (role == "system") {
-            println("hereeeeeeeeeeeeeee")
             parts.forEach { println(it) }
             break
         }
