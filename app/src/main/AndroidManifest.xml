@@ -54,12 +54,7 @@
             android:label="@string/settings"
             android:theme="@style/Theme.Blurr">
         </activity>
-        <activity
-            android:name=".SettingsActivity"
-            android:exported="false"
-            android:label="@string/settings"
-            android:theme="@style/Theme.Blurr">
-        </activity>
+        
 
         <activity
             android:name=".PermissionsActivity"
