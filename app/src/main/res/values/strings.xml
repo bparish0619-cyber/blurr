@@ -58,4 +58,12 @@
     <string name="save_settings">Save Settings</string>
     <string name="settings_saved">Settings saved successfully</string>
     <string name="testing_voice">Testing voice...</string>
+    <string name="why_permissions_needed">Why are these permissions needed?</string>
+    <string name="permissions_explained_title">Permissions Explained</string>
+    <string name="accessibility_permission_title">Accessibility Service</string>
+    <string name="accessibility_permission_desc">Panda needs this permission to see the elements on your screen and to perform actions like tapping and swiping on your behalf. This is the core permission that allows the agent to operate your phone.</string>
+    <string name="microphone_permission_title">Microphone</string>
+    <string name="microphone_permission_desc">The microphone is required for the voice command and wake-word features. It allows you to give instructions to Panda by speaking.</string>
+    <string name="overlay_permission_title">Display Over Other Apps</string>
+    <string name="overlay_permission_desc">This permission is used to show visual feedback, such as the glowing border and voice wave animations, on top of other apps while Panda is working.</string>
 </resources>
