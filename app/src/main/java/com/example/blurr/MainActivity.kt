@@ -167,22 +167,22 @@ class MainActivity : AppCompatActivity() {
         }
         wakeWordButton.setOnClickListener {
             Log.d("MainActivity", "Wake word button clicked, service isRunning: ${EnhancedWakeWordService.isRunning}")
-            
+
             if (EnhancedWakeWordService.isRunning) {
                 // Service is running, so stop it
                 Log.d("MainActivity", "Stopping EnhancedWakeWordService.")
                 stopService(Intent(this, EnhancedWakeWordService::class.java))
                 Toast.makeText(this, getString(R.string.wake_word_disabled), Toast.LENGTH_SHORT).show()
-                
+
                 handler.postDelayed({
                     if (!EnhancedWakeWordService.isRunning) {
                         updateUI()
                     }
-                }, 500)             } else {
+                }, 500)               } else {
                 // Service is not running, so start it
                 Log.d("MainActivity", "Starting EnhancedWakeWordService.")
                 val usePorcupine = porcupineEngineRadio.isChecked
-                
+
                 if (usePorcupine) {
                     // Check if Porcupine access key is configured
                     if (!isPorcupineAccessKeyConfigured()) {
@@ -190,11 +190,11 @@ class MainActivity : AppCompatActivity() {
                         return@setOnClickListener
                     }
                 }
-                
+
                 val serviceIntent = Intent(this, EnhancedWakeWordService::class.java).apply {
                     putExtra(EnhancedWakeWordService.EXTRA_USE_PORCUPINE, usePorcupine)
                 }
-                
+
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                     ContextCompat.startForegroundService(this, serviceIntent)
                     val engineName = if (usePorcupine) "Porcupine" else "STT"
@@ -219,6 +219,12 @@ class MainActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.R)
     private fun setupClickListeners() {
         performTaskButton.setOnClickListener {
+            // Check for permission before proceeding
+            if (!isAccessibilityServiceEnabled()) {
+                Toast.makeText(this, "Accessibility permission is required to perform this task.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+
             val instruction = inputField.text.toString().trim()
             if (instruction.isBlank()) {
                 Toast.makeText(this, "Please enter an instruction", Toast.LENGTH_SHORT).show()
@@ -251,7 +257,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         contentModerationButton.setOnClickListener {
-            // You should apply the same fix here!
+            // Check for permission before proceeding
+            if (!isAccessibilityServiceEnabled()) {
+                Toast.makeText(this, "Accessibility permission is required for content filtering.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+
             lifecycleScope.launch {
                 val instruction = contentModerationInputField.text.toString()
                 if (instruction.isBlank()) {
@@ -421,7 +432,7 @@ class MainActivity : AppCompatActivity() {
                 // Wait a bit for TTS to complete
                 delay(1000)
 
-//                val finalAnswer = deepSearchAgent.execute(instruction)
+//              val finalAnswer = deepSearchAgent.execute(instruction)
 
                 if (instruction == "a") {
                     ttsManager.speakText("I am ready to win Hundred Agents Hackathon, and start new era of personal agents")
@@ -430,25 +441,25 @@ class MainActivity : AppCompatActivity() {
                 //TODO Removing the tavily deepsearch agent as it is bad at searching, sorry but it is. Plan to replace tavily, so leaving the code
 
                 // if (finalAnswer == "NO-SEARCH") {
-                     Log.d("MainActivity", "This is a UI Task. Starting AgentTaskService.")
-                     statusText.text = "Agent started to perform task..."
+                Log.d("MainActivity", "This is a UI Task. Starting AgentTaskService.")
+                statusText.text = "Agent started to perform task..."
 
 
-                     // Determine vision mode based on radio button selection
-                     val visionMode = if (xmlModeRadio.isChecked) VisionMode.XML.name else VisionMode.SCREENSHOT.name
-                     Log.d("MainActivity", "Selected vision mode: $visionMode")
+                // Determine vision mode based on radio button selection
+                val visionMode = if (xmlModeRadio.isChecked) VisionMode.XML.name else VisionMode.SCREENSHOT.name
+                Log.d("MainActivity", "Selected vision mode: $visionMode")
 
-                     val serviceIntent = Intent(this@MainActivity, AgentTaskService::class.java).apply {
-                         putExtra("TASK_INSTRUCTION", instruction)
-                         putExtra("VISION_MODE", visionMode)
-                     }
-                     startService(serviceIntent)
-                     val fin = Finger(this@MainActivity)
-                     fin.home()
+                val serviceIntent = Intent(this@MainActivity, AgentTaskService::class.java).apply {
+                    putExtra("TASK_INSTRUCTION", instruction)
+                    putExtra("VISION_MODE", visionMode)
+                }
+                startService(serviceIntent)
+                val fin = Finger(this@MainActivity)
+                fin.home()
                 // } else {
-//                    Log.d("MainActivity", "Deep Search complete. Answer: $finalAnswer")
-//                    statusText.text = finalAnswer
-//                    ttsManager.speakText(finalAnswer)
+//                   Log.d("MainActivity", "Deep Search complete. Answer: $finalAnswer")
+//                   statusText.text = finalAnswer
+//                   ttsManager.speakText(finalAnswer)
                 // }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error executing task", e)
