@@ -1,121 +1,229 @@
 package com.example.blurr.utilities
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioTrack
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
-import android.speech.tts.TextToSpeech.OnInitListener
 import android.speech.tts.UtteranceProgressListener
+import android.util.Log
+import com.example.blurr.BuildConfig
+import com.example.blurr.api.GoogleTts
+import com.example.blurr.api.TTSVoice
+import com.example.blurr.utilities.VoicePreferenceManager
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
-// REMOVE the TtsHolder object. It is no longer needed.
-// object TtsHolder { ... }
+class TTSManager private constructor(private val context: Context) : TextToSpeech.OnInitListener {
 
-class TTSManager private constructor(context: Context) : OnInitListener {
+    // Native TTS Engine (for fallback)
+    private var nativeTts: TextToSpeech? = null
+    private var isNativeTtsInitialized = CompletableDeferred<Unit>()
 
-    private var tts: TextToSpeech? = null
-    private var isTTSInitialized = CompletableDeferred<Unit>()
-    val audioSessionId: Int
+    // AudioTrack for playing audio data from Google TTS
+    private var audioTrack: AudioTrack? = null
+    private var googleTtsPlaybackDeferred: CompletableDeferred<Unit>? = null
+
     var utteranceListener: ((isSpeaking: Boolean) -> Unit)? = null
-    
-    // Debug flag to control TTS output
+
     private var isDebugMode: Boolean = try {
-        // Try to get from BuildConfig, fallback to true for safety
-        com.example.blurr.BuildConfig.SPEAK_INSTRUCTIONS
+        BuildConfig.SPEAK_INSTRUCTIONS
     } catch (e: Exception) {
-        true // Default to true if BuildConfig is not available
+        true
     }
 
-    init {
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        audioSessionId = audioManager.generateAudioSessionId()
-        tts = TextToSpeech(context, this)
-    }
-    
-    // --- 1. ADD THIS COMPANION OBJECT ---
     companion object {
         @Volatile private var INSTANCE: TTSManager? = null
+        private const val SAMPLE_RATE = 24000 // Google TTS sample rate
 
         fun getInstance(context: Context): TTSManager {
-            // Double-check locking ensures thread safety
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: TTSManager(context.applicationContext).also { INSTANCE = it }
             }
         }
     }
 
+    init {
+        nativeTts = TextToSpeech(context, this)
+        setupAudioTrack()
+    }
+
+    private fun setupAudioTrack() {
+        val bufferSize = AudioTrack.getMinBufferSize(
+            SAMPLE_RATE,
+            AudioFormat.CHANNEL_OUT_MONO,
+            AudioFormat.ENCODING_PCM_16BIT
+        )
+
+        audioTrack = AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(SAMPLE_RATE)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build()
+            )
+            .setBufferSizeInBytes(bufferSize)
+            .build()
+
+        // **Set up the listener to know when playback is finished.**
+        audioTrack?.setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
+            override fun onMarkerReached(track: AudioTrack?) {
+                // This is called when the end of the audio is reached.
+                googleTtsPlaybackDeferred?.complete(Unit)
+            }
+            override fun onPeriodicNotification(track: AudioTrack?) {
+                // Not needed for this use case.
+            }
+        }, Handler(Looper.getMainLooper()))
+    }
+
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {
-                    utteranceListener?.invoke(true)
-                }
-                override fun onDone(utteranceId: String?) {
-                    utteranceListener?.invoke(false)
-                }
-                override fun onError(utteranceId: String?) {
-                    utteranceListener?.invoke(false)
-                }
+            nativeTts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) { utteranceListener?.invoke(true) }
+                override fun onDone(utteranceId: String?) { utteranceListener?.invoke(false) }
+                override fun onError(utteranceId: String?) { utteranceListener?.invoke(false) }
             })
-            isTTSInitialized.complete(Unit)
-            println("TTS Singleton is ready with Audio Session ID: $audioSessionId (Debug Mode: $isDebugMode)")
+            isNativeTtsInitialized.complete(Unit)
+            Log.d("TTSManager", "Native TTS engine initialized successfully.")
         } else {
-            println("TTS Initialization failed")
-            isTTSInitialized.completeExceptionally(Exception("TTS Initialization failed"))
+            Log.e("TTSManager", "Native TTS Initialization failed")
+            isNativeTtsInitialized.completeExceptionally(Exception("Native TTS Initialization failed"))
         }
     }
 
     suspend fun speakText(text: String) {
-        // Only speak if in debug mode
         if (!isDebugMode) {
-            println("TTS: Skipping speech in release mode - '$text'")
+            Log.d("TTSManager", "Skipping speech in release mode - '$text'")
             return
         }
-        
-        isTTSInitialized.await()
-        val params = Bundle().apply {
-            putInt(TextToSpeech.Engine.KEY_PARAM_SESSION_ID, audioSessionId)
-        }
-        val utteranceId = this.hashCode().toString() + "" + System.currentTimeMillis()
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
-        println("TTS: Speaking '$text'")
+        speak(text)
     }
 
-    /**
-     * Speak text regardless of debug mode setting.
-     * This function is used for important user-facing messages that should always be spoken.
-     * @param text The text to speak to the user
-     */
     suspend fun speakToUser(text: String) {
-        isTTSInitialized.await()
-        val params = Bundle().apply {
-            putInt(TextToSpeech.Engine.KEY_PARAM_SESSION_ID, audioSessionId)
-        }
-        val utteranceId = this.hashCode().toString() + "" + System.currentTimeMillis()
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
-        println("TTS: Speaking to user - '$text'")
+        speak(text)
     }
 
-    /**
-     * Override the debug mode setting
-     * @param debugMode true to enable TTS, false to disable
-     */
+    private suspend fun speak(text: String) {
+        try {
+            // --- PRIMARY METHOD: GOOGLE CLOUD TTS ---
+            Log.d("TTSManager", "Attempting to synthesize with Google TTS...")
+            
+            // Get the selected voice from preferences
+            val selectedVoice = VoicePreferenceManager.getSelectedVoice(context)
+            println("aaaaaaaaaaaaaaaaaa $selectedVoice")
+            val audioData = GoogleTts.synthesize(text, selectedVoice)
+
+            // This deferred will complete when onMarkerReached is called.
+            googleTtsPlaybackDeferred = CompletableDeferred()
+
+            // Correctly signal start and wait for completion.
+            withContext(Dispatchers.Main) {
+                utteranceListener?.invoke(true)
+            }
+
+            // Write and play audio on a background thread
+            withContext(Dispatchers.IO) {
+                audioTrack?.play()
+                // The number of frames is the size of the data divided by the size of each frame (2 bytes for 16-bit audio).
+                val numFrames = audioData.size / 2
+                audioTrack?.setNotificationMarkerPosition(numFrames)
+                audioTrack?.write(audioData, 0, audioData.size)
+            }
+
+            // Wait for the playback to complete, with a timeout for safety.
+            withTimeoutOrNull(30000) { // 30-second timeout
+                googleTtsPlaybackDeferred?.await()
+            }
+
+            audioTrack?.stop()
+            audioTrack?.flush()
+
+            withContext(Dispatchers.Main) {
+                utteranceListener?.invoke(false)
+            }
+
+            Log.d("TTSManager", "Successfully played audio from Google TTS.")
+
+        } catch (e: Exception) {
+            // --- FALLBACK METHOD: NATIVE ANDROID TTS ---
+            Log.e("TTSManager", "Google TTS failed: ${e.message}. Falling back to native engine.")
+            withContext(Dispatchers.Main) {
+                utteranceListener?.invoke(false) // Ensure listener is reset on error
+            }
+            isNativeTtsInitialized.await() // Ensure native engine is ready
+
+            val params = Bundle()
+            val utteranceId = this.hashCode().toString() + System.currentTimeMillis()
+            nativeTts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+        }
+    }
+
     fun setDebugMode(debugMode: Boolean) {
         isDebugMode = debugMode
-        println("TTS Debug Mode set to: $isDebugMode")
     }
 
-    /**
-     * Get current debug mode status
-     * @return true if TTS is enabled, false if disabled
-     */
     fun isDebugModeEnabled(): Boolean = isDebugMode
 
+    /**
+     * Play audio data directly using AudioTrack
+     * @param audioData The audio data to play
+     */
+    suspend fun playAudioData(audioData: ByteArray) {
+        try {
+            googleTtsPlaybackDeferred = CompletableDeferred()
+
+            withContext(Dispatchers.Main) {
+                utteranceListener?.invoke(true)
+            }
+
+            withContext(Dispatchers.IO) {
+                audioTrack?.play()
+                val numFrames = audioData.size / 2
+                audioTrack?.setNotificationMarkerPosition(numFrames)
+                audioTrack?.write(audioData, 0, audioData.size)
+            }
+
+            withTimeoutOrNull(30000) {
+                googleTtsPlaybackDeferred?.await()
+            }
+
+            audioTrack?.stop()
+            audioTrack?.flush()
+
+            withContext(Dispatchers.Main) {
+                utteranceListener?.invoke(false)
+            }
+
+            Log.d("TTSManager", "Successfully played audio data.")
+        } catch (e: Exception) {
+            Log.e("TTSManager", "Error playing audio data: ${e.message}")
+            withContext(Dispatchers.Main) {
+                utteranceListener?.invoke(false)
+            }
+            throw e
+        }
+    }
+
     fun shutdown() {
-        // This should only be called if the entire app is closing
-        tts?.stop()
-        tts?.shutdown()
+        nativeTts?.stop()
+        nativeTts?.shutdown()
+        audioTrack?.release()
+        audioTrack = null
         INSTANCE = null
-        println("TTS Singleton has been shut down.")
+        Log.d("TTSManager", "TTSManager has been shut down.")
     }
 }
