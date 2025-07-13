@@ -1,180 +1,245 @@
 package com.example.blurr
 
+import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
+import android.view.View
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.ImageButton
+import android.widget.Button
+import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
+import com.example.blurr.agent.VisionMode
 import com.example.blurr.api.GoogleTts
 import com.example.blurr.api.TTSVoice
+import com.example.blurr.services.EnhancedWakeWordService
 import com.example.blurr.utilities.SpeechCoordinator
-import com.example.blurr.utilities.TTSManager
 import kotlinx.coroutines.launch
-import androidx.core.content.edit
-import android.content.Intent
-import android.widget.Button
 
 class SettingsActivity : AppCompatActivity() {
 
     // --- UI Views ---
     private lateinit var ttsVoiceSpinner: Spinner
-    private lateinit var testVoiceButton: Button // Changed from TextView
-    private lateinit var saveButton: Button    // Changed from TextView
-    private lateinit var backButton: Button      // Changed from TextView
-    private lateinit var permissionsInfoButton: TextView // This one stays as TextView
+    private lateinit var testVoiceButton: Button
+    private lateinit var backButton: Button
+    private lateinit var permissionsInfoButton: TextView
+    private lateinit var visionModeGroup: RadioGroup
+    private lateinit var wakeWordEngineGroup: RadioGroup
+    private lateinit var visionModeDescription: TextView
+    private lateinit var wakeWordButton: Button
 
     // --- Utilities & Data ---
     private lateinit var sc: SpeechCoordinator
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var availableVoices: List<TTSVoice>
 
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                Log.i("SettingsActivity", "Permission GRANTED.")
+                startWakeWordService()
+            } else {
+                Log.w("SettingsActivity", "Permission DENIED.")
+                Toast.makeText(this, "Microphone permission is required for wake word.", Toast.LENGTH_LONG).show()
+            }
+        }
+
     companion object {
-        private const val PREFS_NAME = "TTSVoiceSettings"
+        private const val PREFS_NAME = "BlurrSettings"
         private const val KEY_SELECTED_VOICE = "selected_voice"
+        private const val KEY_SELECTED_VISION_MODE = "selected_vision_mode"
+        private const val KEY_SELECTED_WAKE_WORD_ENGINE = "selected_wake_word_engine"
         private const val TEST_TEXT = "Hello! This is a test of the selected voice."
-        // Use a valid default voice from your new list
-        private val DEFAULT_VOICE = TTSVoice.CHIRP_ZEPHYR
+        private val DEFAULT_VOICE = TTSVoice.CHIRP_PUCK
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Make sure the layout name matches your file, e.g., R.layout.activity_settings
         setContentView(R.layout.activity_settings)
 
         initialize()
         setupUI()
+
+        // Load settings before setting up the auto-save listeners to prevent unwanted triggers
+        loadAllSettings()
+        // Attach listeners after the initial state is set
+        setupAutoSavingListeners()
     }
 
-    /**
-     * Initializes core components like SharedPreferences, TTSManager, and fetches voices.
-     */
+    override fun onResume() {
+        super.onResume()
+        updateUIState()
+    }
+
     private fun initialize() {
         sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         sc = SpeechCoordinator.getInstance(this)
         availableVoices = GoogleTts.getAvailableVoices()
     }
 
-    /**
-     * Sets up all the user interface elements and their listeners.
-     */
     private fun setupUI() {
-        // Find views by their new IDs from your updated layout
+        // Find views by their IDs
         ttsVoiceSpinner = findViewById(R.id.ttsVoiceSpinner)
         testVoiceButton = findViewById(R.id.testVoiceButton)
-        saveButton = findViewById(R.id.saveButton)
         backButton = findViewById(R.id.backButton)
         permissionsInfoButton = findViewById(R.id.permissionsInfoButton)
+        visionModeGroup = findViewById(R.id.visionModeGroup)
+        visionModeDescription = findViewById(R.id.visionModeDescription)
+        wakeWordButton = findViewById(R.id.wakeWordButton)
+        wakeWordEngineGroup = findViewById(R.id.wakeWordEngineGroup)
 
-
-        // Populate the spinner with voice options
-        setupSpinner()
-
-        // Load the last saved voice selection
-        loadSavedVoice()
-
-        // Set up button click actions
         setupClickListeners()
+        setupSpinner()
     }
 
-    /**
-     * Creates an adapter and populates the spinner with the voice display names.
-     */
-    private fun setupSpinner() {
-        val voiceDisplayNames = availableVoices.map { it.displayName }
-        val adapter = ArrayAdapter(this, R.layout.custom_spinner_item, voiceDisplayNames)
-
-        // You can also apply the custom style to the dropdown view
-        adapter.setDropDownViewResource(R.layout.custom_spinner_item)
-
-        ttsVoiceSpinner.adapter = adapter
-    }
-
-    /**
-     * Sets OnClickListeners for the interactive buttons.
-     */
     private fun setupClickListeners() {
         backButton.setOnClickListener { finish() }
-
         testVoiceButton.setOnClickListener { testSelectedVoice() }
-
-        saveButton.setOnClickListener { saveSelectedVoice() }
-
         permissionsInfoButton.setOnClickListener {
             val intent = Intent(this, PermissionsActivity::class.java)
             startActivity(intent)
         }
-    }
-
-    /**
-     * Loads the saved voice from SharedPreferences and updates the spinner's selection.
-     * This now safely handles cases where the saved voice is no longer valid.
-     */
-    private fun loadSavedVoice() {
-        val savedVoiceName = sharedPreferences.getString(KEY_SELECTED_VOICE, DEFAULT_VOICE.name)
-        // Find the voice by its name, or fall back to the default if not found
-        val savedVoice = availableVoices.find { it.name == savedVoiceName } ?: DEFAULT_VOICE
-        val selectionIndex = availableVoices.indexOf(savedVoice)
-
-        if (selectionIndex != -1) {
-            ttsVoiceSpinner.setSelection(selectionIndex)
+        wakeWordButton.setOnClickListener {
+            if (EnhancedWakeWordService.isRunning) {
+                stopService(Intent(this, EnhancedWakeWordService::class.java))
+                Toast.makeText(this, getString(R.string.wake_word_disabled), Toast.LENGTH_SHORT).show()
+                updateUIState()
+            } else {
+                startWakeWordService()
+            }
         }
     }
 
-    /**
-     * Gets the currently selected TTSVoice from the spinner.
-     */
-    private fun getSelectedVoice(): TTSVoice {
-        val selectedPosition = ttsVoiceSpinner.selectedItemPosition
-        // Return the selected voice, or default if the position is somehow invalid
-        return availableVoices.getOrElse(selectedPosition) { DEFAULT_VOICE }
+    private fun setupAutoSavingListeners() {
+        // Auto-save when the TTS Voice spinner selection changes
+        ttsVoiceSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val selectedVoice = availableVoices[position]
+                saveSelectedVoice(selectedVoice)
+                // ADDED: Show a toast to confirm the change
+                Toast.makeText(this@SettingsActivity, "Voice set to ${selectedVoice.displayName}", Toast.LENGTH_SHORT).show()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        // Auto-save when the Vision Mode radio group changes
+        visionModeGroup.setOnCheckedChangeListener { _, checkedId ->
+            val modeName = if (checkedId == R.id.xmlModeRadio) "XML" else "Screenshot"
+            visionModeDescription.text = if (checkedId == R.id.xmlModeRadio) VisionMode.XML.description else VisionMode.SCREENSHOT.description
+            saveVisionMode(checkedId)
+            Toast.makeText(this, "Vision Mode set to $modeName", Toast.LENGTH_SHORT).show()
+        }
+
+        // Auto-save when the Wake Word Engine radio group changes
+        wakeWordEngineGroup.setOnCheckedChangeListener { _, checkedId ->
+            saveWakeWordEngine(checkedId)
+            val engineName = if (checkedId == R.id.sttEngineRadio) "STT" else "Porcupine"
+            Toast.makeText(this, "Wake Word Engine set to $engineName", Toast.LENGTH_SHORT).show()
+        }
     }
 
-    /**
-     * Tests the currently selected voice by synthesizing and playing a sample text.
-     */
+    private fun startWakeWordService() {
+        val usePorcupine = wakeWordEngineGroup.checkedRadioButtonId == R.id.porcupineEngineRadio
+        if (usePorcupine && !isPorcupineAccessKeyConfigured()) {
+            Toast.makeText(this, getString(R.string.porcupine_access_key_required), Toast.LENGTH_LONG).show()
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            val serviceIntent = Intent(this, EnhancedWakeWordService::class.java).apply {
+                putExtra(EnhancedWakeWordService.EXTRA_USE_PORCUPINE, usePorcupine)
+            }
+            ContextCompat.startForegroundService(this, serviceIntent)
+            val engineName = if (usePorcupine) "Porcupine" else "STT"
+            Toast.makeText(this, getString(R.string.wake_word_enabled, engineName), Toast.LENGTH_SHORT).show()
+            updateUIState()
+        } else {
+            requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun updateUIState() {
+        wakeWordButton.text = if (EnhancedWakeWordService.isRunning) getString(R.string.wake_word_disabled) else getString(R.string.enable_wake_word)
+    }
+
+    private fun loadAllSettings() {
+        // Load TTS voice
+        val savedVoiceName = sharedPreferences.getString(KEY_SELECTED_VOICE, DEFAULT_VOICE.name)
+        val savedVoice = availableVoices.find { it.name == savedVoiceName } ?: DEFAULT_VOICE
+        ttsVoiceSpinner.setSelection(availableVoices.indexOf(savedVoice), false)
+
+        // Load Vision Mode
+        val savedVisionId = sharedPreferences.getInt(KEY_SELECTED_VISION_MODE, R.id.xmlModeRadio)
+        visionModeGroup.check(savedVisionId)
+
+        // Load Wake Word Engine
+        val savedWakeWordId = sharedPreferences.getInt(KEY_SELECTED_WAKE_WORD_ENGINE, R.id.sttEngineRadio)
+        wakeWordEngineGroup.check(savedWakeWordId)
+    }
+
     private fun testSelectedVoice() {
-        val selectedVoice = getSelectedVoice()
-        saveSelectedVoice()
+        val selectedVoice = availableVoices[ttsVoiceSpinner.selectedItemPosition]
         testVoiceButton.isEnabled = false
-        testVoiceButton.text = "Testing..." // Use string resource for better practice
+        testVoiceButton.text = getString(R.string.testing_voice)
 
         lifecycleScope.launch {
             try {
-                val tts = TTSManager.getInstance(this@SettingsActivity)
-                tts.speakText(TEST_TEXT)
+                sc.speakToUser(TEST_TEXT)
                 Toast.makeText(this@SettingsActivity, "Playing: ${selectedVoice.displayName}", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Log.e("SettingsActivity", "Error testing voice: ${e.message}", e)
                 Toast.makeText(this@SettingsActivity, "Error testing voice.", Toast.LENGTH_LONG).show()
             } finally {
                 testVoiceButton.isEnabled = true
-                testVoiceButton.text = "Test Selected Voice" // Use string resource
+                testVoiceButton.text = getString(R.string.test_selected_voice)
             }
         }
     }
 
-    /**
-     * Saves the currently selected voice name to SharedPreferences.
-     */
-    private fun saveSelectedVoice() {
-        val selectedVoice = getSelectedVoice()
+    private fun saveSelectedVoice(voice: TTSVoice) {
         sharedPreferences.edit {
-            putString(KEY_SELECTED_VOICE, selectedVoice.name)
+            putString(KEY_SELECTED_VOICE, voice.name)
         }
-
-        Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show()
-        Log.d("SettingsActivity", "Saved voice: ${selectedVoice.displayName}")
+        Log.d("SettingsActivity", "Saved voice: ${voice.displayName}")
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        // Gracefully shut down the TTS manager to release resources
+    private fun saveVisionMode(checkedId: Int) {
+        sharedPreferences.edit {
+            putInt(KEY_SELECTED_VISION_MODE, checkedId)
+        }
+        Log.d("SettingsActivity", "Saved vision mode ID: $checkedId")
+    }
 
+    private fun saveWakeWordEngine(checkedId: Int) {
+        sharedPreferences.edit {
+            putInt(KEY_SELECTED_WAKE_WORD_ENGINE, checkedId)
+        }
+        Log.d("SettingsActivity", "Saved wake word engine ID: $checkedId")
+    }
+
+    private fun setupSpinner() {
+        val voiceDisplayNames = availableVoices.map { it.displayName }
+        val adapter = ArrayAdapter(this, R.layout.custom_spinner_item, voiceDisplayNames)
+        adapter.setDropDownViewResource(R.layout.custom_spinner_item)
+        ttsVoiceSpinner.adapter = adapter
+    }
+
+    private fun isPorcupineAccessKeyConfigured(): Boolean {
+        return try {
+            val accessKey = BuildConfig.PICOVOICE_ACCESS_KEY
+            accessKey.isNotEmpty() && accessKey != "your_actual_access_key_here"
+        } catch (e: Exception) {
+            false
+        }
     }
 }
