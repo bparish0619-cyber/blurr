@@ -194,7 +194,7 @@
                     android:id="@+id/sttEngineRadio"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:checked="true"
+                    android:checked="false"
                     android:text="@string/stt_engine"
                     android:textColor="#CECECE"
                     android:buttonTint="#5880F7" />
@@ -204,6 +204,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/porcupine_engine"
+                    android:checked="true"
                     android:textColor="#CECECE"
                     android:buttonTint="#5880F7" />
 

@@ -173,7 +173,8 @@ class MainActivity : AppCompatActivity() {
                     if (!EnhancedWakeWordService.isRunning) {
                         updateUI()
                     }
-                }, 500)             } else {
+                }, 500)             }
+            else {
                 // Service is not running, so start it
                 Log.d("MainActivity", "Starting EnhancedWakeWordService.")
                 val usePorcupine = porcupineEngineRadio.isChecked
