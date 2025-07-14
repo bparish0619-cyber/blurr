@@ -246,6 +246,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
         contentModerationButton.setOnClickListener {
             // You should apply the same fix here!
             lifecycleScope.launch {
