@@ -30,6 +30,7 @@ import android.view.Gravity
 import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.core.graphics.toColorInt
+import com.example.blurr.utilities.STTVisualizer
 import com.example.blurr.utilities.TTSManager
 import com.example.blurr.utilities.addResponse
 import com.example.blurr.utilities.getReasoningModelApiResponse
@@ -60,8 +61,7 @@ class ConversationalAgentService : Service() {
 
 
      private val clarificationAgent = ClarificationAgent()
-    private var agentUtteranceView: View? = null
-    private val windowManager by lazy { getSystemService(Context.WINDOW_SERVICE) as WindowManager }
+    private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
     companion object {
@@ -81,6 +81,7 @@ class ConversationalAgentService : Service() {
         isRunning = true
         createNotificationChannel()
         initializeConversation()
+        ttsManager.setCaptionsEnabled(true)
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -101,7 +102,11 @@ class ConversationalAgentService : Service() {
     @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun speakAndThenListen(text: String, draw: Boolean = true) { // Default draw to true
         if (draw) {
-            displayAgentUtterance(text)
+            Log.d("ConvAgent", "Displaying agent utterance: $text. Setting captions to true.")
+            ttsManager.setCaptionsEnabled(true)
+        } else {
+            Log.d("ConvAgent", "Not displaying agent utterance: $text. Setting captions to false.")
+            ttsManager.setCaptionsEnabled(false)
         }
         speechCoordinator.speakText(text)
         Log.d("ConvAgent", "Panda said: $text")
@@ -121,6 +126,7 @@ class ConversationalAgentService : Service() {
                 Log.d("ConvAgent", "Listening state: $listening")
             }
         )
+        ttsManager.setCaptionsEnabled(true)
     }
 
     // --- CHANGED: Rewritten to process the new custom text format ---
@@ -146,16 +152,19 @@ class ConversationalAgentService : Service() {
                     "Task" -> {
                         Log.d("ConvAgent", "Model identified a task. Checking for clarification...")
                         // --- NEW: Check if the task instruction needs clarification ---
+                        removeClarificationQuestions()
                         val (needsClarification, questions) = checkIfClarificationNeeded(decision.instruction)
 
                         if (needsClarification) {
                             displayClarificationQuestions(questions)
                             // If clarification is needed, ask the questions and continue the conversation.
-                            val questionToAsk = "I can help with that, but first: ${questions.joinToString(" ")}"
+                            val questionToAsk = "I can help with that, but first: ${questions.joinToString(" and ")}"
                             Log.d("ConvAgent", "Task needs clarification. Asking: '$questionToAsk'")
                             conversationHistory = addResponse("model", "Clarification needed for task: ${decision.instruction}", conversationHistory)
                             speakAndThenListen(questionToAsk, false)
                         } else {
+                            Log.d("ConvAgent", "Clearing the questions")
+
                             // If no clarification is needed, execute the task.
                             Log.d("ConvAgent", "Task is clear. Executing: ${decision.instruction}")
                             speechCoordinator.speakText(decision.reply)
@@ -289,71 +298,6 @@ class ConversationalAgentService : Service() {
         }
     }
 
-    /**
-     * Displays the agent's spoken text in an overlay on the screen.
-     * It removes any previously shown text and automatically hides after a delay.
-     */
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun displayAgentUtterance(text: String) {
-        // All view operations must be on the main thread.
-        mainHandler.post {
-            // 1. Remove the previous view if it's still visible.
-            agentUtteranceView?.let {
-                if (it.isAttachedToWindow) {
-                    try {
-                        windowManager.removeView(it)
-                    } catch (e: Exception) {
-                        Log.e("ConvAgent", "Error removing previous utterance view.", e)
-                    }
-                }
-            }
-
-            // 2. Create and style the new TextView.
-            val textView = TextView(this).apply {
-                this.text = text
-                // Semi-transparent black background with rounded corners for better visibility.
-                background = GradientDrawable().apply {
-                    setColor(0xCC000000.toInt()) // 80% opaque black
-                    cornerRadius = 24f
-                }
-                setTextColor(0xFFFFFFFF.toInt()) // White text
-                textSize = 16f
-                setPadding(24, 16, 24, 16)
-            }
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-                PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                y = 250 // Pixels up from the bottom of the screen
-            }
-
-            // 4. Add the view to the window.
-            try {
-                agentUtteranceView = textView // Save a reference to the new view.
-
-                // 5. Schedule the view to be removed automatically.
-                // This removes any pending removal tasks for the old view.
-
-                ttsManager.utteranceListener = { isSpeaking ->
-                    Handler(Looper.getMainLooper()).post {
-                        if (isSpeaking) {
-                            windowManager.addView(textView, params)
-
-                        } else {
-                            windowManager.removeView(textView)
-
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("ConvAgent", "Failed to display agent utterance on screen.", e)
-            }
-        }
-    }
 
 
     /**
@@ -365,7 +309,6 @@ class ConversationalAgentService : Service() {
     private fun displayClarificationQuestions(questions: List<String>) {
         mainHandler.post {
             // First, remove any questions that might already be on screen
-            removeClarificationQuestions()
 
             val topMargin = 100 // Base margin from the very top of the screen
             val verticalSpacing = 20 // Space between question boxes
@@ -478,14 +421,8 @@ class ConversationalAgentService : Service() {
         super.onDestroy()
         Log.d("ConvAgent", "Service onDestroy")
         removeClarificationQuestions()
-        mainHandler.post {
-            agentUtteranceView?.let {
-                if (it.isAttachedToWindow) {
-                    windowManager.removeView(it)
-                }
-            }
-        }
         serviceScope.cancel()
+        ttsManager.setCaptionsEnabled(false)
         isRunning = false
     }
 
