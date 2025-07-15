@@ -1,10 +1,9 @@
 package com.example.blurr
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
-import android.view.View
+import android.view.MotionEvent
+import android.view.inputmethod.EditorInfo
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -85,11 +84,11 @@ class DialogueActivity : AppCompatActivity() {
     private fun setupVoiceInput() {
         voiceInputButton.setOnTouchListener { _, event ->
             when (event.action) {
-                android.view.MotionEvent.ACTION_DOWN -> {
+                MotionEvent.ACTION_DOWN -> {
                     startVoiceInput()
                     true
                 }
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     stopVoiceInput()
                     true
                 }
@@ -110,7 +109,7 @@ class DialogueActivity : AppCompatActivity() {
 
         // Handle Enter key in input field
         answerInput.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
                 val answer = answerInput.text.toString().trim()
                 if (answer.isNotEmpty()) {
                     submitAnswer(answer)
@@ -136,7 +135,7 @@ class DialogueActivity : AppCompatActivity() {
                     voiceInputButton.isPressed = false
                     answerInput.setText(recognizedText)
                     Toast.makeText(this, "Recognized: $recognizedText", Toast.LENGTH_SHORT).show()
-                    
+
                     // Automatically submit the answer after a short delay
                     lifecycleScope.launch {
                         delay(1000) // Wait 1 second for user to see the recognized text
@@ -149,7 +148,7 @@ class DialogueActivity : AppCompatActivity() {
                     voiceStatusText.text = getString(R.string.hold_to_speak)
                     voiceInputButton.isPressed = false
                     Toast.makeText(this, "Error: $errorMessage", Toast.LENGTH_SHORT).show()
-                    
+
                     // If there was an error, restart voice input after a delay
                     lifecycleScope.launch {
                         delay(2000)

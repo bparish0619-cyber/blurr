@@ -1,6 +1,8 @@
 package com.example.blurr.utilities
 
 import android.content.Context
+import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -11,6 +13,10 @@ import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
+import android.widget.TextView
 import com.example.blurr.BuildConfig
 import com.example.blurr.api.GoogleTts
 import com.example.blurr.api.TTSVoice
@@ -25,6 +31,11 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
     // Native TTS Engine (for fallback)
     private var nativeTts: TextToSpeech? = null
     private var isNativeTtsInitialized = CompletableDeferred<Unit>()
+    // --- NEW: Properties for Caption Management ---
+    private val windowManager by lazy { context.getSystemService(Context.WINDOW_SERVICE) as WindowManager }
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var captionView: View? = null
+    private var captionsEnabled = false
 
     // AudioTrack for playing audio data from Google TTS
     private var audioTrack: AudioTrack? = null
@@ -90,12 +101,29 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
         }, Handler(Looper.getMainLooper()))
     }
 
+    fun setCaptionsEnabled(enabled: Boolean) {
+        this.captionsEnabled = enabled
+        // If captions are disabled while one is showing, remove it immediately.
+        if (!enabled) {
+            mainHandler.post { removeCaption() }
+        }
+    }
+
+    fun getCaptionStatus(): Boolean{
+        return this.captionsEnabled
+    }
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             nativeTts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) { utteranceListener?.invoke(true) }
-                override fun onDone(utteranceId: String?) { utteranceListener?.invoke(false) }
-                override fun onError(utteranceId: String?) { utteranceListener?.invoke(false) }
+                override fun onDone(utteranceId: String?) {
+                    mainHandler.post { removeCaption() }
+
+                    utteranceListener?.invoke(false) }
+                override fun onError(utteranceId: String?) {
+                    mainHandler.post { removeCaption() }
+
+                    utteranceListener?.invoke(false) }
             })
             isNativeTtsInitialized.complete(Unit)
             Log.d("TTSManager", "Native TTS engine initialized successfully.")
@@ -116,7 +144,10 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
     suspend fun speakToUser(text: String) {
         speak(text)
     }
-
+    // Add this new function inside your TTSManager class
+    fun getAudioSessionId(): Int {
+        return audioTrack?.audioSessionId ?: 0
+    }
     private suspend fun speak(text: String) {
         try {
             // --- PRIMARY METHOD: GOOGLE CLOUD TTS ---
@@ -131,6 +162,7 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
 
             // Correctly signal start and wait for completion.
             withContext(Dispatchers.Main) {
+                showCaption(text)
                 utteranceListener?.invoke(true)
             }
 
@@ -152,6 +184,7 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
             audioTrack?.flush()
 
             withContext(Dispatchers.Main) {
+                removeCaption()
                 utteranceListener?.invoke(false)
             }
 
@@ -186,6 +219,7 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
             googleTtsPlaybackDeferred = CompletableDeferred()
 
             withContext(Dispatchers.Main) {
+
                 utteranceListener?.invoke(true)
             }
 
@@ -217,6 +251,55 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
         }
     }
 
+    // --- NEW: Private method to display the caption view ---
+    private fun showCaption(text: String) {
+        if (!captionsEnabled) return
+
+        removeCaption() // Remove any previous caption first
+
+        // Create and style the new TextView.
+        val textView = TextView(context).apply {
+            this.text = text
+            background = GradientDrawable().apply {
+                setColor(0xCC000000.toInt()) // 80% opaque black
+                cornerRadius = 24f
+            }
+            setTextColor(0xFFFFFFFF.toInt()) // White text
+            textSize = 16f
+            setPadding(24, 16, 24, 16)
+        }
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            y = 250 // Pixels up from the bottom of the screen
+        }
+
+        try {
+            windowManager.addView(textView, params)
+            captionView = textView // Save a reference to the new view.
+        } catch (e: Exception) {
+            Log.e("TTSManager", "Failed to display caption on screen.", e)
+        }
+    }
+    // --- NEW: Private method to remove the caption view ---
+    private fun removeCaption() {
+        captionView?.let {
+            if (it.isAttachedToWindow) {
+                try {
+                    windowManager.removeView(it)
+                } catch (e: Exception) {
+                    Log.e("TTSManager", "Error removing caption view.", e)
+                }
+            }
+        }
+        captionView = null
+    }
     fun shutdown() {
         nativeTts?.stop()
         nativeTts?.shutdown()

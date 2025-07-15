@@ -9,7 +9,10 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import com.example.blurr.ConversationalAgentService
 import com.example.blurr.MainActivity
 import com.example.blurr.R
 import com.example.blurr.api.PorcupineWakeWordDetector
@@ -65,12 +68,16 @@ class EnhancedWakeWordService : Service() {
     }
 
     private fun startWakeWordDetection() {
-        val onWakeWordDetected = {
-            Log.d("EnhancedWakeWordService", "Wake word detected! Launching MainActivity.")
-            val intent = Intent(this, MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val onWakeWordDetected: () -> Unit = {
+            // Check if the conversational agent isn't already running
+            if (!ConversationalAgentService.isRunning) {
+                val serviceIntent = Intent(this, ConversationalAgentService::class.java)
+                ContextCompat.startForegroundService(this, serviceIntent)
+
+                Toast.makeText(this, "Panda listening...", Toast.LENGTH_SHORT).show()
+            } else {
+                Log.d("EnhancedWakeWordService", "Conversational agent is already running.")
             }
-            startActivity(intent)
         }
 
         try {

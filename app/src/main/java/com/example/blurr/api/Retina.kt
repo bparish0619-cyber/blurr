@@ -83,29 +83,29 @@ class Retina(
         val clickableInfos = mutableListOf<ClickableInfo>()
 
         // Only perform visual analysis if NOT in XML mode (i.e., in screenshot mode)
-        if (!config.isXmlMode) {
-            Log.d("Retina", "Performing visual analysis (screenshot mode)")
-            // Step 4: Send request to Gemini
-            val responseText = GeminiApi.generateContent(boundingBoxSystemInstructionsv3, listOf(bitmap), context = context)
-            val sanitizedJson = sanitizeJson(responseText.toString())
-
-            val boxes = extractJsonArray(sanitizedJson)
-            boxes.mapNotNull { obj ->
-                try {
-                    val box = obj.getJSONArray("box_2d")
-                    val label = obj.getString("label")
-                    val ymin = box.getDouble(0) / 1000 * height
-                    val xmin = box.getDouble(1) / 1000 * width
-                    val ymax = box.getDouble(2) / 1000 * height
-                    val xmax = box.getDouble(3) / 1000 * width
-                    val centerX = ((xmin + xmax) / 2).toInt()
-                    val centerY = ((ymin + ymax) / 2).toInt()
-                    clickableInfos.add(ClickableInfo("icon: $label", centerX to centerY))
-                } catch (e: Exception) {
-                    null
-                }
-            }
-        }
+//        if (!config.isXmlMode) {
+//            Log.d("Retina", "Performing visual analysis (screenshot mode)")
+//            // Step 4: Send request to Gemini
+//            val responseText = GeminiApi.generateContent(boundingBoxSystemInstructionsv3, listOf(bitmap), context = context)
+//            val sanitizedJson = sanitizeJson(responseText.toString())
+//
+//            val boxes = extractJsonArray(sanitizedJson)
+//            boxes.mapNotNull { obj ->
+//                try {
+//                    val box = obj.getJSONArray("box_2d")
+//                    val label = obj.getString("label")
+//                    val ymin = box.getDouble(0) / 1000 * height
+//                    val xmin = box.getDouble(1) / 1000 * width
+//                    val ymax = box.getDouble(2) / 1000 * height
+//                    val xmax = box.getDouble(3) / 1000 * width
+//                    val centerX = ((xmin + xmax) / 2).toInt()
+//                    val centerY = ((ymin + ymax) / 2).toInt()
+//                    clickableInfos.add(ClickableInfo("icon: $label", centerX to centerY))
+//                } catch (e: Exception) {
+//                    null
+//                }
+//            }
+//        }
 
         val keyboardOpen = eyes.getKeyBoardStatus()
 

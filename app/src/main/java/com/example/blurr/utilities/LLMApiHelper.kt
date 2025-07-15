@@ -42,6 +42,7 @@ fun addResponse(
     updatedChat.add(Pair(role, messageParts))
     return updatedChat
 }
+
 fun addResponsePrePost(
     role: String,
     prompt: String,
@@ -73,13 +74,13 @@ suspend fun getReasoningModelApiResponse(
     apiKey: String
 ): String? { // Return nullable String
     // Assuming the last message in the chat is the one we want to send.
-    val lastMessage = chat.lastOrNull() ?: return null
-
-    val prompt = lastMessage.second.filterIsInstance<TextPart>().joinToString(" ") { it.text }
-    val images = lastMessage.second.filterIsInstance<ImagePart>().map { it.image }
+//    val lastMessage = chat.lastOrNull() ?: return null
+//
+//    val prompt = lastMessage.second.filterIsInstance<TextPart>().joinToString(" ") { it.text }
+//    val images = lastMessage.second.filterIsInstance<ImagePart>().map { it.image }
 
     // Just one simple, clean call!
-    return GeminiApi.generateContent(prompt, images)
+    return GeminiApi.generateContent(chat)
 }
 
 

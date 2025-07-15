@@ -21,6 +21,8 @@ class STTManager(private val context: Context) {
     private var onErrorCallback: ((String) -> Unit)? = null
     private var onListeningStateChange: ((Boolean) -> Unit)? = null
     private var isInitialized = false
+    private val visualizerManager = STTVisualizer(context)
+
     
     // Remove initialization from constructor - will be done lazily on main thread
     
@@ -54,9 +56,10 @@ class STTManager(private val context: Context) {
             override fun onBeginningOfSpeech() {
                 Log.d("STTManager", "Beginning of speech")
             }
-            
+
             override fun onRmsChanged(rmsdB: Float) {
-                // Optional: Can be used for visual feedback
+                // --- NEW: Invoke the callback with the new audio level ---
+                visualizerManager.onRmsChanged(rmsdB)
             }
             
             override fun onBufferReceived(buffer: ByteArray?) {
@@ -72,7 +75,8 @@ class STTManager(private val context: Context) {
             override fun onError(error: Int) {
                 isListening = false
                 onListeningStateChange?.invoke(false)
-                
+                visualizerManager.hide()
+
                 val errorMessage = when (error) {
                     SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
                     SpeechRecognizer.ERROR_CLIENT -> "Client side error"
@@ -93,7 +97,8 @@ class STTManager(private val context: Context) {
             override fun onResults(results: Bundle?) {
                 isListening = false
                 onListeningStateChange?.invoke(false)
-                
+                visualizerManager.hide()
+
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (!matches.isNullOrEmpty()) {
                     val recognizedText = matches[0]
@@ -118,7 +123,7 @@ class STTManager(private val context: Context) {
     fun startListening(
         onResult: (String) -> Unit,
         onError: (String) -> Unit,
-        onListeningStateChange: (Boolean) -> Unit
+        onListeningStateChange: (Boolean) -> Unit,
     ) {
         if (isListening) {
             Log.w("STTManager", "Already listening")
@@ -128,7 +133,8 @@ class STTManager(private val context: Context) {
         this.onResultCallback = onResult
         this.onErrorCallback = onError
         this.onListeningStateChange = onListeningStateChange
-        
+
+
         // Initialize on main thread if needed
         CoroutineScope(Dispatchers.Main).launch {
             initializeSpeechRecognizer()
@@ -137,7 +143,9 @@ class STTManager(private val context: Context) {
                 onError("Speech recognition not available")
                 return@launch
             }
-            
+            visualizerManager.show()
+
+
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
@@ -174,6 +182,8 @@ class STTManager(private val context: Context) {
         } catch (e: Exception) {
             Log.e("STTManager", "Error destroying speech recognizer", e)
         }
+        visualizerManager.hide()
+
         speechRecognizer = null
         isListening = false
         isInitialized = false
