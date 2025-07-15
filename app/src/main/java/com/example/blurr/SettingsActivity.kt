@@ -25,6 +25,7 @@ import com.example.blurr.api.GoogleTts
 import com.example.blurr.api.TTSVoice
 import com.example.blurr.services.EnhancedWakeWordService
 import com.example.blurr.utilities.SpeechCoordinator
+import com.example.blurr.utilities.VoicePreferenceManager // Import VoicePreferenceManager
 import kotlinx.coroutines.launch
 
 class SettingsActivity : AppCompatActivity() {
@@ -92,7 +93,7 @@ class SettingsActivity : AppCompatActivity() {
         // Find views by their IDs
         ttsVoiceSpinner = findViewById(R.id.ttsVoiceSpinner)
         testVoiceButton = findViewById(R.id.testVoiceButton)
-        backButton = findViewById(R.id.backButton)
+        backButton = findViewById(R.id.id_backButtonSettings) // Updated ID as per XML below
         permissionsInfoButton = findViewById(R.id.permissionsInfoButton)
         visionModeGroup = findViewById(R.id.visionModeGroup)
         visionModeDescription = findViewById(R.id.visionModeDescription)
@@ -122,30 +123,41 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun setupAutoSavingListeners() {
-        // Auto-save when the TTS Voice spinner selection changes
+        // Use a flag to prevent toasts from firing during initial load
+        var isInitialLoad = true
+
         ttsVoiceSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 val selectedVoice = availableVoices[position]
                 saveSelectedVoice(selectedVoice)
-                // ADDED: Show a toast to confirm the change
-                Toast.makeText(this@SettingsActivity, "Voice set to ${selectedVoice.displayName}", Toast.LENGTH_SHORT).show()
+                if (!isInitialLoad) { // Only show toast if not during initial load
+                    Toast.makeText(this@SettingsActivity, "Voice set to ${selectedVoice.displayName}", Toast.LENGTH_SHORT).show()
+                }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        // Auto-save when the Vision Mode radio group changes
         visionModeGroup.setOnCheckedChangeListener { _, checkedId ->
             val modeName = if (checkedId == R.id.xmlModeRadio) "XML" else "Screenshot"
             visionModeDescription.text = if (checkedId == R.id.xmlModeRadio) VisionMode.XML.description else VisionMode.SCREENSHOT.description
             saveVisionMode(checkedId)
-            Toast.makeText(this, "Vision Mode set to $modeName", Toast.LENGTH_SHORT).show()
+            if (!isInitialLoad) { // Only show toast if not during initial load
+                Toast.makeText(this, "Vision Mode set to $modeName", Toast.LENGTH_SHORT).show()
+            }
         }
 
-        // Auto-save when the Wake Word Engine radio group changes
         wakeWordEngineGroup.setOnCheckedChangeListener { _, checkedId ->
             saveWakeWordEngine(checkedId)
             val engineName = if (checkedId == R.id.sttEngineRadio) "STT" else "Porcupine"
-            Toast.makeText(this, "Wake Word Engine set to $engineName", Toast.LENGTH_SHORT).show()
+            if (!isInitialLoad) { // Only show toast if not during initial load
+                Toast.makeText(this, "Wake Word Engine set to $engineName", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Ensure this runs after onCreate finishes its layout and initial selections
+        // so isInitialLoad properly transitions to false after initial setup.
+        ttsVoiceSpinner.post {
+            isInitialLoad = false
         }
     }
 
@@ -188,12 +200,15 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun testSelectedVoice() {
-        val selectedVoice = availableVoices[ttsVoiceSpinner.selectedItemPosition]
+        // Get the selected voice from preferences (using the utility object)
+        val selectedVoice = VoicePreferenceManager.getSelectedVoice(this) // Uses the global VoicePreferenceManager
+
         testVoiceButton.isEnabled = false
         testVoiceButton.text = getString(R.string.testing_voice)
 
         lifecycleScope.launch {
             try {
+                // sc is your SpeechCoordinator instance, which uses TTSManager internally
                 sc.speakToUser(TEST_TEXT)
                 Toast.makeText(this@SettingsActivity, "Playing: ${selectedVoice.displayName}", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
@@ -206,10 +221,11 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    // Removed the private fun getSelectedVoice(): TTSVoice method as it's no longer needed.
+
     private fun saveSelectedVoice(voice: TTSVoice) {
-        sharedPreferences.edit {
-            putString(KEY_SELECTED_VOICE, voice.name)
-        }
+        // Now directly use VoicePreferenceManager to save
+        VoicePreferenceManager.saveSelectedVoice(this, voice)
         Log.d("SettingsActivity", "Saved voice: ${voice.displayName}")
     }
 

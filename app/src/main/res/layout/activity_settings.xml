@@ -20,7 +20,7 @@
             android:padding="16dp">
 
             <Button
-                android:id="@+id/backButton"
+                android:id="@+id/id_backButtonSettings"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentStart="true"

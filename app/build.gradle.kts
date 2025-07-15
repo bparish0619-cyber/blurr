@@ -47,7 +47,7 @@ android {
             buildConfigField("String", "MEM0_API", "\"$mem0ApiKey\"")
             val picovoiceApiKey = localProperties.getProperty("PICOVOICE_ACCESS_KEY") ?: ""
             buildConfigField("String", "PICOVOICE_ACCESS_KEY", "\"$picovoiceApiKey\"")
-            
+
             // Debug flag for direct app opening (set to false for production)
             buildConfigField("boolean", "ENABLE_DIRECT_APP_OPENING", "true")
             buildConfigField("boolean", "SPEAK_INSTRUCTIONS", "true")
@@ -67,7 +67,7 @@ android {
             buildConfigField("String", "MEM0_API", "\"$mem0ApiKey\"")
             val picovoiceApiKey = localProperties.getProperty("PICOVOICE_ACCESS_KEY") ?: ""
             buildConfigField("String", "PICOVOICE_ACCESS_KEY", "\"$picovoiceApiKey\"")
-            
+
             // Debug flag for direct app opening (set to true for debugging, false for production)
             buildConfigField("boolean", "ENABLE_DIRECT_APP_OPENING", "true")
             buildConfigField("boolean", "SPEAK_INSTRUCTIONS", "true")
@@ -128,7 +128,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     // https://mvnrepository.com/artifact/androidx.test.uiautomator/uiautomator
     implementation("androidx.test.uiautomator:uiautomator:2.3.0")
-    
+
     // Porcupine Wake Word Engine
     implementation("ai.picovoice:porcupine-android:3.0.2")
 

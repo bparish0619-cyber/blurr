@@ -2,16 +2,21 @@ package com.example.blurr.utilities
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit // Make sure this import is present
 import com.example.blurr.api.TTSVoice
 
 object VoicePreferenceManager {
-    private const val PREFS_NAME = "TTSVoiceSettings"
+    // FIX: Changed PREFS_NAME to match SettingsActivity for consistency.
+    // This ensures both read/write to the same preferences file.
+    private const val PREFS_NAME = "BlurrSettings" // THIS LINE WAS CHANGED
+
     private const val KEY_SELECTED_VOICE = "selected_voice"
 
     fun getSelectedVoice(context: Context): TTSVoice {
         val sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val selectedVoiceName = sharedPreferences.getString(KEY_SELECTED_VOICE, TTSVoice.CHIRP_ZEPHYR.name)
-        return TTSVoice.valueOf(selectedVoiceName ?: TTSVoice.CHIRP_ZEPHYR.name)
+        // Ensure this default also matches your intended default (CHIRP_PUCK)
+        val selectedVoiceName = sharedPreferences.getString(KEY_SELECTED_VOICE, TTSVoice.CHIRP_PUCK.name)
+        return TTSVoice.valueOf(selectedVoiceName ?: TTSVoice.CHIRP_PUCK.name)
     }
 
     fun saveSelectedVoice(context: Context, voice: TTSVoice) {
@@ -20,4 +25,4 @@ object VoicePreferenceManager {
             .putString(KEY_SELECTED_VOICE, voice.name)
             .apply()
     }
-} 
+}
