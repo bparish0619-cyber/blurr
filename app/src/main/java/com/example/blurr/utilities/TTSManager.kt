@@ -19,14 +19,12 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.cancellation.CancellationException
 
 class TTSManager private constructor(private val context: Context) : TextToSpeech.OnInitListener {
 
-    // Native TTS Engine (for fallback)
     private var nativeTts: TextToSpeech? = null
     private var isNativeTtsInitialized = CompletableDeferred<Unit>()
-
-    // AudioTrack for playing audio data from Google TTS
     private var audioTrack: AudioTrack? = null
     private var googleTtsPlaybackDeferred: CompletableDeferred<Unit>? = null
 
@@ -40,7 +38,7 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
 
     companion object {
         @Volatile private var INSTANCE: TTSManager? = null
-        private const val SAMPLE_RATE = 24000 // Google TTS sample rate
+        private const val SAMPLE_RATE = 24000
 
         fun getInstance(context: Context): TTSManager {
             return INSTANCE ?: synchronized(this) {
@@ -60,7 +58,6 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
             AudioFormat.CHANNEL_OUT_MONO,
             AudioFormat.ENCODING_PCM_16BIT
         )
-
         audioTrack = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -78,15 +75,11 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
             .setBufferSizeInBytes(bufferSize)
             .build()
 
-        // **Set up the listener to know when playback is finished.**
         audioTrack?.setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
             override fun onMarkerReached(track: AudioTrack?) {
-                // This is called when the end of the audio is reached.
                 googleTtsPlaybackDeferred?.complete(Unit)
             }
-            override fun onPeriodicNotification(track: AudioTrack?) {
-                // Not needed for this use case.
-            }
+            override fun onPeriodicNotification(track: AudioTrack?) {}
         }, Handler(Looper.getMainLooper()))
     }
 
@@ -98,18 +91,27 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
                 override fun onError(utteranceId: String?) { utteranceListener?.invoke(false) }
             })
             isNativeTtsInitialized.complete(Unit)
-            Log.d("TTSManager", "Native TTS engine initialized successfully.")
         } else {
-            Log.e("TTSManager", "Native TTS Initialization failed")
             isNativeTtsInitialized.completeExceptionally(Exception("Native TTS Initialization failed"))
         }
     }
 
-    suspend fun speakText(text: String) {
-        if (!isDebugMode) {
-            Log.d("TTSManager", "Skipping speech in release mode - '$text'")
-            return
+    // --- NEW PUBLIC FUNCTION TO STOP PLAYBACK ---
+    fun stop() {
+        // Stop the AudioTrack if it's currently playing
+        if (audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING) {
+            audioTrack?.stop()
+            audioTrack?.flush() // Clear any buffered data
         }
+        // Immediately cancel any coroutine that is awaiting playback completion
+        if (googleTtsPlaybackDeferred?.isActive == true) {
+            googleTtsPlaybackDeferred?.completeExceptionally(CancellationException("Playback stopped by new request."))
+        }
+    }
+    // --- END OF NEW FUNCTION ---
+
+    suspend fun speakText(text: String) {
+        if (!isDebugMode) return
         speak(text)
     }
 
@@ -119,75 +121,21 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
 
     private suspend fun speak(text: String) {
         try {
-            // --- PRIMARY METHOD: GOOGLE CLOUD TTS ---
-            Log.d("TTSManager", "Attempting to synthesize with Google TTS...")
-            
-            // Get the selected voice from preferences
             val selectedVoice = VoicePreferenceManager.getSelectedVoice(context)
             val audioData = GoogleTts.synthesize(text, selectedVoice)
-
-            // This deferred will complete when onMarkerReached is called.
-            googleTtsPlaybackDeferred = CompletableDeferred()
-
-            // Correctly signal start and wait for completion.
-            withContext(Dispatchers.Main) {
-                utteranceListener?.invoke(true)
-            }
-
-            // Write and play audio on a background thread
-            withContext(Dispatchers.IO) {
-                audioTrack?.play()
-                // The number of frames is the size of the data divided by the size of each frame (2 bytes for 16-bit audio).
-                val numFrames = audioData.size / 2
-                audioTrack?.setNotificationMarkerPosition(numFrames)
-                audioTrack?.write(audioData, 0, audioData.size)
-            }
-
-            // Wait for the playback to complete, with a timeout for safety.
-            withTimeoutOrNull(30000) { // 30-second timeout
-                googleTtsPlaybackDeferred?.await()
-            }
-
-            audioTrack?.stop()
-            audioTrack?.flush()
-
-            withContext(Dispatchers.Main) {
-                utteranceListener?.invoke(false)
-            }
-
-            Log.d("TTSManager", "Successfully played audio from Google TTS.")
-
+            playAudioData(audioData)
         } catch (e: Exception) {
-            // --- FALLBACK METHOD: NATIVE ANDROID TTS ---
+            if (e is CancellationException) throw e // Re-throw cancellation to stop execution
             Log.e("TTSManager", "Google TTS failed: ${e.message}. Falling back to native engine.")
-            withContext(Dispatchers.Main) {
-                utteranceListener?.invoke(false) // Ensure listener is reset on error
-            }
-            isNativeTtsInitialized.await() // Ensure native engine is ready
-
-            val params = Bundle()
-            val utteranceId = this.hashCode().toString() + System.currentTimeMillis()
-            nativeTts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+            isNativeTtsInitialized.await()
+            nativeTts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, this.hashCode().toString())
         }
     }
 
-    fun setDebugMode(debugMode: Boolean) {
-        isDebugMode = debugMode
-    }
-
-    fun isDebugModeEnabled(): Boolean = isDebugMode
-
-    /**
-     * Play audio data directly using AudioTrack
-     * @param audioData The audio data to play
-     */
     suspend fun playAudioData(audioData: ByteArray) {
         try {
             googleTtsPlaybackDeferred = CompletableDeferred()
-
-            withContext(Dispatchers.Main) {
-                utteranceListener?.invoke(true)
-            }
+            withContext(Dispatchers.Main) { utteranceListener?.invoke(true) }
 
             withContext(Dispatchers.IO) {
                 audioTrack?.play()
@@ -196,33 +144,30 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
                 audioTrack?.write(audioData, 0, audioData.size)
             }
 
-            withTimeoutOrNull(30000) {
-                googleTtsPlaybackDeferred?.await()
-            }
+            withTimeoutOrNull(30000) { googleTtsPlaybackDeferred?.await() }
 
-            audioTrack?.stop()
-            audioTrack?.flush()
-
-            withContext(Dispatchers.Main) {
-                utteranceListener?.invoke(false)
-            }
-
-            Log.d("TTSManager", "Successfully played audio data.")
+            withContext(Dispatchers.Main) { utteranceListener?.invoke(false) }
         } catch (e: Exception) {
-            Log.e("TTSManager", "Error playing audio data: ${e.message}")
-            withContext(Dispatchers.Main) {
+            if (e is CancellationException) throw e
+            Log.e("TTSManager", "Error playing audio data", e)
+        } finally {
+            if (audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING) {
+                audioTrack?.stop()
+                audioTrack?.flush()
+            }
+            if (utteranceListener != null && Looper.myLooper() != Looper.getMainLooper()) {
+                withContext(Dispatchers.Main) { utteranceListener?.invoke(false) }
+            } else {
                 utteranceListener?.invoke(false)
             }
-            throw e
         }
     }
 
     fun shutdown() {
-        nativeTts?.stop()
+        stop()
         nativeTts?.shutdown()
         audioTrack?.release()
         audioTrack = null
         INSTANCE = null
-        Log.d("TTSManager", "TTSManager has been shut down.")
     }
 }
