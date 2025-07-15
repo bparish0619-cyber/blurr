@@ -82,10 +82,8 @@ class SpeechCoordinator private constructor(private val context: Context) {
                 isSpeaking = true
                 Log.d(TAG, "Starting TTS to user: $text")
 
-                // This is a suspend call that will wait until TTS is actually done.
                 ttsManager.speakToUser(text)
 
-                // FIXED: The inaccurate, estimated delay has been removed!
 
                 Log.d(TAG, "TTS to user completed: $text")
 

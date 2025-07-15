@@ -4,10 +4,18 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
+import android.animation.ValueAnimator
+import android.graphics.Typeface
+import android.graphics.drawable.LayerDrawable
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import android.view.View
+import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import com.example.blurr.agent.AgentConfig
 import com.example.blurr.agent.ClarificationAgent
@@ -16,6 +24,13 @@ import com.example.blurr.agent.VisionHelper
 import com.example.blurr.agent.VisionMode
 import com.example.blurr.services.AgentTaskService
 import com.example.blurr.utilities.SpeechCoordinator
+import android.os.Handler
+import android.os.Looper
+import android.view.Gravity
+import android.widget.TextView
+import androidx.annotation.RequiresApi
+import androidx.core.graphics.toColorInt
+import com.example.blurr.utilities.TTSManager
 import com.example.blurr.utilities.addResponse
 import com.example.blurr.utilities.getReasoningModelApiResponse
 import kotlinx.coroutines.CoroutineScope
@@ -38,8 +53,16 @@ class ConversationalAgentService : Service() {
     private val speechCoordinator by lazy { SpeechCoordinator.getInstance(this) }
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var conversationHistory = listOf<Pair<String, List<Any>>>()
+    private val ttsManager by lazy { TTSManager.getInstance(this) }
+    private val clarificationQuestionViews = mutableListOf<View>()
 
-     private val clarificationAgent = ClarificationAgent() // Example initialization
+    // Add these at the top of your ConversationalAgentService class
+
+
+     private val clarificationAgent = ClarificationAgent()
+    private var agentUtteranceView: View? = null
+    private val windowManager by lazy { getSystemService(Context.WINDOW_SERVICE) as WindowManager }
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
     companion object {
         const val NOTIFICATION_ID = 3
@@ -60,6 +83,7 @@ class ConversationalAgentService : Service() {
         initializeConversation()
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("ConvAgent", "Service onStartCommand")
         startForeground(NOTIFICATION_ID, createNotification())
@@ -67,7 +91,6 @@ class ConversationalAgentService : Service() {
         serviceScope.launch {
             if (conversationHistory.size == 1) {
                 val greeting = "Hello! How can I help you today?"
-                // Add the initial greeting to history (doesn't need to follow the complex format)
                 conversationHistory = addResponse("model", greeting, conversationHistory)
                 speakAndThenListen(greeting)
             }
@@ -75,11 +98,14 @@ class ConversationalAgentService : Service() {
         return START_STICKY
     }
 
-    private suspend fun speakAndThenListen(text: String) {
+    @RequiresApi(Build.VERSION_CODES.O)
+    private suspend fun speakAndThenListen(text: String, draw: Boolean = true) { // Default draw to true
+        if (draw) {
+            displayAgentUtterance(text)
+        }
         speechCoordinator.speakText(text)
         Log.d("ConvAgent", "Panda said: $text")
 
-        // Then start listening for user input
         speechCoordinator.startListening(
             onResult = { recognizedText ->
                 Log.d("ConvAgent", "User said: $recognizedText")
@@ -98,8 +124,11 @@ class ConversationalAgentService : Service() {
     }
 
     // --- CHANGED: Rewritten to process the new custom text format ---
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun processUserInput(userInput: String) {
         serviceScope.launch {
+            removeClarificationQuestions()
+
             conversationHistory = addResponse("user", userInput, conversationHistory)
 
             try {
@@ -120,11 +149,12 @@ class ConversationalAgentService : Service() {
                         val (needsClarification, questions) = checkIfClarificationNeeded(decision.instruction)
 
                         if (needsClarification) {
+                            displayClarificationQuestions(questions)
                             // If clarification is needed, ask the questions and continue the conversation.
                             val questionToAsk = "I can help with that, but first: ${questions.joinToString(" ")}"
                             Log.d("ConvAgent", "Task needs clarification. Asking: '$questionToAsk'")
                             conversationHistory = addResponse("model", "Clarification needed for task: ${decision.instruction}", conversationHistory)
-                            speakAndThenListen(questionToAsk)
+                            speakAndThenListen(questionToAsk, false)
                         } else {
                             // If no clarification is needed, execute the task.
                             Log.d("ConvAgent", "Task is clear. Executing: ${decision.instruction}")
@@ -138,6 +168,8 @@ class ConversationalAgentService : Service() {
                             startService(taskIntent)
                             stopSelf()
                         }
+
+
                     }
                     else -> { // Default to "Reply"
                         if (decision.shouldEnd) {
@@ -257,9 +289,202 @@ class ConversationalAgentService : Service() {
         }
     }
 
+    /**
+     * Displays the agent's spoken text in an overlay on the screen.
+     * It removes any previously shown text and automatically hides after a delay.
+     */
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun displayAgentUtterance(text: String) {
+        // All view operations must be on the main thread.
+        mainHandler.post {
+            // 1. Remove the previous view if it's still visible.
+            agentUtteranceView?.let {
+                if (it.isAttachedToWindow) {
+                    try {
+                        windowManager.removeView(it)
+                    } catch (e: Exception) {
+                        Log.e("ConvAgent", "Error removing previous utterance view.", e)
+                    }
+                }
+            }
+
+            // 2. Create and style the new TextView.
+            val textView = TextView(this).apply {
+                this.text = text
+                // Semi-transparent black background with rounded corners for better visibility.
+                background = GradientDrawable().apply {
+                    setColor(0xCC000000.toInt()) // 80% opaque black
+                    cornerRadius = 24f
+                }
+                setTextColor(0xFFFFFFFF.toInt()) // White text
+                textSize = 16f
+                setPadding(24, 16, 24, 16)
+            }
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                y = 250 // Pixels up from the bottom of the screen
+            }
+
+            // 4. Add the view to the window.
+            try {
+                agentUtteranceView = textView // Save a reference to the new view.
+
+                // 5. Schedule the view to be removed automatically.
+                // This removes any pending removal tasks for the old view.
+
+                ttsManager.utteranceListener = { isSpeaking ->
+                    Handler(Looper.getMainLooper()).post {
+                        if (isSpeaking) {
+                            windowManager.addView(textView, params)
+
+                        } else {
+                            windowManager.removeView(textView)
+
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ConvAgent", "Failed to display agent utterance on screen.", e)
+            }
+        }
+    }
+
+
+    /**
+     * Displays a list of futuristic-styled clarification questions at the top of the screen.
+     * Each question animates in from the top with a fade-in effect.
+     *
+     * @param questions The list of question strings to display.
+     */
+    private fun displayClarificationQuestions(questions: List<String>) {
+        mainHandler.post {
+            // First, remove any questions that might already be on screen
+            removeClarificationQuestions()
+
+            val topMargin = 100 // Base margin from the very top of the screen
+            val verticalSpacing = 20 // Space between question boxes
+            var accumulatedHeight = 0 // Tracks the vertical space used by previous questions
+
+            questions.forEachIndexed { index, questionText ->
+                // 1. Create and style the TextView
+                val textView = TextView(this).apply {
+                    text = questionText
+                    // --- (Your existing styling code is perfect, no changes needed here) ---
+                    val glowEffect = GradientDrawable(
+                        GradientDrawable.Orientation.BL_TR,
+                        intArrayOf("#BE63F3".toColorInt(), "#5880F7".toColorInt())
+                    ).apply { cornerRadius = 32f }
+
+                    val glassBackground = GradientDrawable(
+                        GradientDrawable.Orientation.TL_BR,
+                        intArrayOf(0xEE0D0D2E.toInt(), 0xEE2A0D45.toInt())
+                    ).apply {
+                        cornerRadius = 28f
+                        setStroke(1, 0x80FFFFFF.toInt())
+                    }
+
+                    val layerDrawable = LayerDrawable(arrayOf(glowEffect, glassBackground)).apply {
+                        setLayerInset(1, 4, 4, 4, 4)
+                    }
+                    background = layerDrawable
+                    setTextColor(0xFFE0E0E0.toInt())
+                    textSize = 15f
+                    setPadding(40, 24, 40, 24)
+                    typeface = Typeface.MONOSPACE
+                }
+
+                // **--- FIX IS HERE ---**
+                // A. Measure the view to get its dimensions *before* positioning.
+                textView.measure(
+                    View.MeasureSpec.makeMeasureSpec((windowManager.defaultDisplay.width * 0.9).toInt(), View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                )
+                val viewHeight = textView.measuredHeight
+
+                // B. Pre-calculate the final Y position using the current accumulated height.
+                val finalYPosition = topMargin + accumulatedHeight
+
+                // C. Update accumulatedHeight for the *next* view in the loop.
+                accumulatedHeight += viewHeight + verticalSpacing
+                // **--- END OF FIX ---**
+
+
+                // 2. Prepare layout params
+                val params = WindowManager.LayoutParams(
+                    (windowManager.defaultDisplay.width * 0.9).toInt(), // 90% of screen width
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                    PixelFormat.TRANSLUCENT
+                ).apply {
+                    gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                    // Initial animation state: off-screen at the top and fully transparent
+                    y = -viewHeight // Start above the screen
+                    alpha = 0f
+                }
+
+                // 3. Add the view and start the animation
+                try {
+                    windowManager.addView(textView, params)
+                    clarificationQuestionViews.add(textView)
+
+                    // Animate the view from its starting position to the calculated finalYPosition
+                    val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+                        duration = 500L
+                        startDelay = (index * 150).toLong() // Stagger animation
+
+                        addUpdateListener { animation ->
+                            val progress = animation.animatedValue as Float
+                            // Animate Y position from its off-screen start to its final place
+                            params.y = (finalYPosition * progress - viewHeight * (1 - progress)).toInt()
+                            params.alpha = progress
+                            windowManager.updateViewLayout(textView, params)
+                        }
+                    }
+                    animator.start()
+
+                } catch (e: Exception) {
+                    Log.e("ConvAgent", "Failed to display futuristic clarification question.", e)
+                }
+            }
+        }
+    }
+
+    /**
+     * Removes all currently displayed clarification questions from the screen.
+     */
+    private fun removeClarificationQuestions() {
+        mainHandler.post {
+            clarificationQuestionViews.forEach { view ->
+                if (view.isAttachedToWindow) {
+                    try {
+                        windowManager.removeView(view)
+                    } catch (e: Exception) {
+                        Log.e("ConvAgent", "Error removing clarification view.", e)
+                    }
+                }
+            }
+            clarificationQuestionViews.clear()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         Log.d("ConvAgent", "Service onDestroy")
+        removeClarificationQuestions()
+        mainHandler.post {
+            agentUtteranceView?.let {
+                if (it.isAttachedToWindow) {
+                    windowManager.removeView(it)
+                }
+            }
+        }
         serviceScope.cancel()
         isRunning = false
     }

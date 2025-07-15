@@ -846,7 +846,7 @@ class ScreenInteractionService : AccessibilityService() {
      */
     private fun setupAudioWaveEffect() {
         showAudioWave()
-        val ttsManager = TTSManager.getInstance(this) ?: return
+        val ttsManager = TTSManager.getInstance(this)
         val audioSessionId = ttsManager.getAudioSessionId()
 
         if (audioSessionId == 0) {
