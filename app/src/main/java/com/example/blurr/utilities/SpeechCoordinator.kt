@@ -32,7 +32,7 @@ class SpeechCoordinator private constructor(private val context: Context) {
 
     // Mutex to ensure only one speech operation at a time
     private val speechMutex = Mutex()
-
+    private var ttsPlaybackJob: Job? = null
     // State tracking
     private var isSpeaking = false
     private var isListening = false
@@ -96,7 +96,30 @@ class SpeechCoordinator private constructor(private val context: Context) {
             }
         }
     }
-
+    /**
+     * Plays raw audio data directly using TTSManager, bypassing synthesis.
+     * Ideal for playing cached voice samples.
+     */
+    suspend fun playAudioData(data: ByteArray) {
+        ttsPlaybackJob?.cancel(CancellationException("New audio data request received"))
+        ttsPlaybackJob = CoroutineScope(Dispatchers.IO).launch {
+            speechMutex.withLock {
+                try {
+                    if (isListening) {
+                        sttManager.stopListening()
+                        isListening = false
+                        delay(200)
+                    }
+                    // Directly use the TTSManager's playback function
+                    ttsManager.playAudioData(data)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error during audio data playback", e)
+                }
+            }
+        }
+    }
     /**
      * Start listening with STT, ensuring TTS is not speaking
      * @param onResult Callback for speech recognition results
@@ -193,7 +216,6 @@ class SpeechCoordinator private constructor(private val context: Context) {
     }
 
     fun shutdown() {
-        stop()
         stopListening()
         sttManager.shutdown()
     }

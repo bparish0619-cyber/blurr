@@ -38,7 +38,7 @@
     <string name="porcupine_engine">Porcupine Engine (Panda)</string>
     <string name="select_wake_word_engine">Select Wake Word Engine</string>
     <string name="wake_word_enabled">Wake Word enabled with %s</string>
-    <string name="wake_word_disabled">Wake Word disabled</string>
+    <string name="wake_word_disabled">Disable Wake Word</string>
     <string name="porcupine_access_key_required">Porcupine Access Key required</string>
     <string name="settings">Settings</string>
     <string name="back">Back</string>
@@ -65,5 +65,5 @@
     <string name="microphone_permission_title">Microphone</string>
     <string name="microphone_permission_desc">The microphone is required for the voice command and wake-word features. It allows you to give instructions to Panda by speaking.</string>
     <string name="overlay_permission_title">Display Over Other Apps</string>
-    <string name="overlay_permission_desc">This permission is used to show visual feedback, such as the glowing border and voice wave animations, on top of other apps while Panda is working.</string>
+    <string name="overlay_permission_desc">This permission is used to show visual feedback, such as the questions that panda have, captions and the voice wave animations, on top of other apps while Panda is working.</string>
 </resources>

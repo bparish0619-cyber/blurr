@@ -48,7 +48,9 @@ class SettingsActivity : AppCompatActivity() {
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
-                startWakeWordService()
+                lifecycleScope.launch {
+                    startWakeWordService()
+                }
             } else {
                 Toast.makeText(this, "Microphone permission is required for wake word.", Toast.LENGTH_LONG).show()
             }
@@ -118,9 +120,13 @@ class SettingsActivity : AppCompatActivity() {
             if (EnhancedWakeWordService.isRunning) {
                 stopService(Intent(this, EnhancedWakeWordService::class.java))
                 Toast.makeText(this, getString(R.string.wake_word_disabled), Toast.LENGTH_SHORT).show()
-                updateUIState()
+                lifecycleScope.launch {
+                    updateUIState()
+                }
             } else {
-                startWakeWordService()
+                lifecycleScope.launch {
+                    startWakeWordService()
+                }
             }
         }
 
@@ -219,7 +225,7 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun startWakeWordService() {
+    private suspend fun startWakeWordService() {
         val usePorcupine = wakeWordEngineGroup.checkedRadioButtonId == R.id.porcupineEngineRadio
         if (usePorcupine && !isPorcupineAccessKeyConfigured()) {
             Toast.makeText(this, getString(R.string.porcupine_access_key_required), Toast.LENGTH_LONG).show()
@@ -238,7 +244,8 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateUIState() {
+    private suspend fun updateUIState() {
+        delay(500)
         wakeWordButton.text = if (EnhancedWakeWordService.isRunning) getString(R.string.wake_word_disabled) else getString(R.string.enable_wake_word)
     }
 

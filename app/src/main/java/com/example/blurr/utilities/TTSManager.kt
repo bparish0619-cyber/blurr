@@ -157,7 +157,7 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
         try {
             val selectedVoice = VoicePreferenceManager.getSelectedVoice(context)
             val audioData = GoogleTts.synthesize(text, selectedVoice)
-==
+
 
             // This deferred will complete when onMarkerReached is called.
             googleTtsPlaybackDeferred = CompletableDeferred()
@@ -203,10 +203,7 @@ class TTSManager private constructor(private val context: Context) : TextToSpeec
     suspend fun playAudioData(audioData: ByteArray) {
         try {
             googleTtsPlaybackDeferred = CompletableDeferred()
-
-
             withContext(Dispatchers.Main) {
-
                 utteranceListener?.invoke(true)
             }
 

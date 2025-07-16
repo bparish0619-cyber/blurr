@@ -1,8 +1,10 @@
 package com.example.blurr
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ComponentCallbacks2
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.*
 
@@ -18,6 +20,7 @@ import android.graphics.LinearGradient
 import android.graphics.Shader
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -37,6 +40,7 @@ import com.example.blurr.services.WakeWordService
 import com.example.blurr.services.EnhancedWakeWordService
 import com.example.blurr.utilities.getReasoningModelApiResponse
 import android.view.View
+import com.example.blurr.services.AgentTaskService
 import com.example.blurr.utilities.PermissionManager
 
 class MainActivity : AppCompatActivity() {
@@ -62,6 +66,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var permissionManager: PermissionManager
     private lateinit var conversationalAgentButton: TextView
 
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                Toast.makeText(this, "Microphone permission granted!", Toast.LENGTH_SHORT).show()
+                // The onResume will handle updating the UI
+            } else {
+                Toast.makeText(this, "Permission denied.", Toast.LENGTH_SHORT).show()
+            }
+        }
 
     private val dialogueLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -85,7 +98,8 @@ class MainActivity : AppCompatActivity() {
         val userIdManager = UserIdManager(applicationContext)
         userId = userIdManager.getOrCreateUserId()
         println(userId)
-
+        askForNotificationPermission()
+        checkAndRequestOverlayPermission()
         // Initialize permission manager
         permissionManager = PermissionManager(this)
         permissionManager.initializePermissionLauncher()
@@ -101,10 +115,6 @@ class MainActivity : AppCompatActivity() {
         voiceInputButton = findViewById(R.id.voiceInputButton)
         voiceStatusText = findViewById(R.id.voiceStatusText)
 
-        wakeWordButton = findViewById(R.id.wakeWordButton)
-        wakeWordEngineGroup = findViewById(R.id.wakeWordEngineGroup)
-        sttEngineRadio = findViewById(R.id.sttEngineRadio)
-        porcupineEngineRadio = findViewById(R.id.porcupineEngineRadio)
         conversationalAgentButton = findViewById(R.id.conversationalAgentButton)
         settingsButton = findViewById(R.id.settingsButton)
         // REMOVED findViewById for settings views
@@ -344,7 +354,7 @@ class MainActivity : AppCompatActivity() {
     private fun executeTask(instruction: String) {
         // ... (this logic remains unchanged, but you might want to pass vision mode from settings)
         // For now, it defaults to what was previously hardcoded behavior.
-         val visionMode = if (xmlModeRadio.isChecked) VisionMode.XML.name else VisionMode.SCREENSHOT.name
+         val visionMode =  VisionMode.XML.name
 
         lifecycleScope.launch {
             try {
@@ -391,7 +401,6 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         sttManager.shutdown()
-        ttsManager.shutdown()
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
