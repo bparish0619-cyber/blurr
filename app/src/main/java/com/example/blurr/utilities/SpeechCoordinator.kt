@@ -2,14 +2,17 @@ package com.example.blurr.utilities
 
 import android.content.Context
 import android.util.Log
+import com.example.blurr.api.GoogleTts
+import com.example.blurr.api.TTSVoice
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.delay
+import kotlin.coroutines.cancellation.CancellationException
 
-/**
- * Coordinates between TTS and STT to prevent them from running simultaneously.
- * This ensures a better user experience by avoiding audio conflicts.
- */
 class SpeechCoordinator private constructor(private val context: Context) {
 
     companion object {
@@ -100,13 +103,48 @@ class SpeechCoordinator private constructor(private val context: Context) {
      * @param onError Callback for speech recognition errors
      * @param onListeningStateChange Callback for listening state changes
      */
+    suspend fun testVoice(text: String, voice: TTSVoice) {
+        ttsPlaybackJob?.cancel(CancellationException("New voice test request received"))
+        ttsPlaybackJob = CoroutineScope(Dispatchers.IO).launch {
+            speechMutex.withLock {
+                try {
+                    if (isListening) {
+                        sttManager.stopListening()
+                        isListening = false
+                        delay(200)
+                    }
+                    // 1. Synthesize audio with the specific voice HERE
+                    val audioData = GoogleTts.synthesize(text, voice)
+
+                    // 2. Play the synthesized audio data
+                    ttsManager.playAudioData(audioData)
+
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error during voice test", e)
+                }
+            }
+        }
+    }
+
+    fun stop() {
+        // Cancel the coroutine managing the playback
+        ttsPlaybackJob?.cancel(CancellationException("Playback stopped by user action"))
+        // Call the underlying TTS Manager's stop function to halt the hardware
+        ttsManager.stop()
+        Log.d(TAG, "All TTS playback stopped by coordinator.")
+    }
+
     suspend fun startListening(
         onResult: (String) -> Unit,
         onError: (String) -> Unit,
         onListeningStateChange: (Boolean) -> Unit
     ) {
+        stop() // Use our new stop function to ensure TTS is stopped before listening
         speechMutex.withLock {
             try {
+
                 // If TTS is speaking, wait for it to complete. This loop is now
                 // much more efficient as isSpeaking is updated accurately.
                 if (isSpeaking) {
@@ -118,18 +156,10 @@ class SpeechCoordinator private constructor(private val context: Context) {
                 }
 
                 isListening = true
-                Log.d(TAG, "Starting STT")
                 sttManager.startListening(
-                    onResult = { result ->
-                        Log.d(TAG, "STT result: $result")
-                        onResult(result)
-                    },
-                    onError = { error ->
-                        Log.d(TAG, "STT error: $error")
-                        onError(error)
-                    },
+                    onResult = { result -> onResult(result) },
+                    onError = { error -> onError(error) },
                     onListeningStateChange = { listening ->
-                        Log.d(TAG, "STT listening state: $listening")
                         isListening = listening
                         onListeningStateChange(listening)
                     }
@@ -137,7 +167,6 @@ class SpeechCoordinator private constructor(private val context: Context) {
 
             } catch (e: Exception) {
                 isListening = false
-                Log.e(TAG, "Error starting STT", e)
                 onError("Failed to start speech recognition: ${e.message}")
             }
         }
@@ -145,11 +174,11 @@ class SpeechCoordinator private constructor(private val context: Context) {
 
     fun stopListening() {
         if (isListening) {
-            Log.d(TAG, "Stopping STT")
             sttManager.stopListening()
             isListening = false
         }
     }
+
 
     fun isCurrentlySpeaking(): Boolean = isSpeaking
 
@@ -164,8 +193,8 @@ class SpeechCoordinator private constructor(private val context: Context) {
     }
 
     fun shutdown() {
+        stop()
         stopListening()
         sttManager.shutdown()
-        Log.d(TAG, "SpeechCoordinator shutdown")
     }
 }

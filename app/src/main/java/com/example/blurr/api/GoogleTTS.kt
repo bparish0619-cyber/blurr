@@ -60,8 +60,7 @@ object GoogleTts {
      * @return A ByteArray containing the raw audio data (LINEAR16 PCM).
      * @throws Exception if the API call fails or the response is invalid.
      */
-    suspend fun synthesize(text: String): ByteArray = synthesize(text, TTSVoice.CHIRP_ZEPHYR)
-
+    suspend fun synthesize(text: String): ByteArray = synthesize(text, TTSVoice.CHIRP_PUCK)
     /**
      * Synthesizes speech from text using the Google Cloud TTS API.
      * @param text The text to synthesize.

@@ -4,8 +4,9 @@
     style="?android:attr/spinnerItemStyle"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:ellipsize="marquee"
+    android:ellipsize="end"
     android:singleLine="true"
-    android:textColor="#FFFFFFFF"
-    android:background="@color/black"
-    android:textAlignment="inherit" />
+    android:padding="16dp"
+    android:textColor="@color/white"
+    android:textSize="16sp"
+    android:background="?android:attr/selectableItemBackground" />

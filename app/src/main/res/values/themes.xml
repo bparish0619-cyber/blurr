@@ -44,6 +44,12 @@
         <item name="android:textSize">14sp</item>
     </style>
 
+    <style name="AppTheme.NumberPicker" parent="Theme.AppCompat.Light">
+        <item name="android:textColorPrimary">@android:color/white</item>
+
+        <item name="colorControlNormal">@android:color/transparent</item>
+    </style>
+
 </resources>
 
 
