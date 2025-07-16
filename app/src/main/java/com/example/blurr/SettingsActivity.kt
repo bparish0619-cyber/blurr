@@ -123,6 +123,7 @@ class SettingsActivity : AppCompatActivity() {
                 startWakeWordService()
             }
         }
+
     }
 
     private fun setupAutoSavingListeners() {

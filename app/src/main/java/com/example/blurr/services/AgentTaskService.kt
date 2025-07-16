@@ -22,6 +22,7 @@ import com.example.blurr.api.MemoryService
 import com.example.blurr.api.Retina
 import com.example.blurr.utilities.AppContextUtility
 import com.example.blurr.utilities.Persistent
+import com.example.blurr.utilities.SpeechCoordinator
 import com.example.blurr.utilities.TTSManager
 import com.example.blurr.utilities.UserIdManager
 import com.example.blurr.utilities.addResponse
@@ -135,7 +136,7 @@ class AgentTaskService : Service() {
     @RequiresApi(Build.VERSION_CODES.R)
     private suspend fun runAgentLogic(inputText: String, visionMode: String) {
         delay(2000)
-            val speechCoordinator = com.example.blurr.utilities.SpeechCoordinator.getInstance(this)
+            val speechCoordinator = SpeechCoordinator.getInstance(this)
             val taskStartTime = System.currentTimeMillis()
             val context = this
             val API_KEY = ""

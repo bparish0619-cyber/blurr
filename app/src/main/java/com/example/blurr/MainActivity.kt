@@ -5,8 +5,7 @@ import android.content.ComponentCallbacks2
 import android.content.Intent
 import android.graphics.Color
 import android.os.*
-import android.provider.Settings
-import android.text.TextUtils
+
 import android.util.Log
 import android.widget.*
 import androidx.annotation.RequiresApi
@@ -14,8 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.blurr.api.Finger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.delay
-import android.Manifest
-import android.content.pm.PackageManager
+
 import android.graphics.LinearGradient
 import android.graphics.Shader
 import android.net.Uri
@@ -34,10 +32,12 @@ import com.example.blurr.utilities.UserIdManager
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import com.example.blurr.agent.VisionHelper
-import com.example.blurr.services.AgentTaskService
+import com.example.blurr.ConversationalAgentService
+import com.example.blurr.services.WakeWordService
 import com.example.blurr.services.EnhancedWakeWordService
 import com.example.blurr.utilities.getReasoningModelApiResponse
 import android.view.View
+import com.example.blurr.utilities.PermissionManager
 
 class MainActivity : AppCompatActivity() {
 
@@ -59,17 +59,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var deepSearchAgent: DeepSearch
     private lateinit var clarificationAgent: ClarificationAgent
     private lateinit var userId: String
+    private lateinit var permissionManager: PermissionManager
+    private lateinit var conversationalAgentButton: TextView
 
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            if (isGranted) {
-                Log.i("MainActivity", "Permission GRANTED.")
-                Toast.makeText(this, "Permission granted!", Toast.LENGTH_SHORT).show()
-            } else {
-                Log.w("MainActivity", "Permission DENIED.")
-                Toast.makeText(this, "Permission denied. Some features may not work properly.", Toast.LENGTH_LONG).show()
-            }
-        }
 
     private val dialogueLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -94,7 +86,10 @@ class MainActivity : AppCompatActivity() {
         userId = userIdManager.getOrCreateUserId()
         println(userId)
 
-        askForNotificationPermission()
+        // Initialize permission manager
+        permissionManager = PermissionManager(this)
+        permissionManager.initializePermissionLauncher()
+        permissionManager.requestAllPermissions()
 
         grantPermission = findViewById(R.id.btn_request_permission)
         tvPermissionStatus = findViewById(R.id.tv_permission_status)
@@ -105,12 +100,17 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.tv_service_status)
         voiceInputButton = findViewById(R.id.voiceInputButton)
         voiceStatusText = findViewById(R.id.voiceStatusText)
+
+        wakeWordButton = findViewById(R.id.wakeWordButton)
+        wakeWordEngineGroup = findViewById(R.id.wakeWordEngineGroup)
+        sttEngineRadio = findViewById(R.id.sttEngineRadio)
+        porcupineEngineRadio = findViewById(R.id.porcupineEngineRadio)
+        conversationalAgentButton = findViewById(R.id.conversationalAgentButton)
         settingsButton = findViewById(R.id.settingsButton)
         // REMOVED findViewById for settings views
 
         grantPermission.setOnClickListener {
-            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            startActivity(intent)
+            permissionManager.openAccessibilitySettings()
         }
 
         ttsManager = TTSManager.getInstance(this)
@@ -133,7 +133,7 @@ class MainActivity : AppCompatActivity() {
             null, Shader.TileMode.CLAMP
         )
         karanTextView.paint.shader = textShader
-        checkAndRequestOverlayPermission()
+        permissionManager.checkAndRequestOverlayPermission()
         val githubLink = findViewById<TextView>(R.id.github_link_textview)
         githubLink.setOnClickListener {
             val url = "https://github.com/Ayush0Chaudhary/blurr"
@@ -141,7 +141,6 @@ class MainActivity : AppCompatActivity() {
             intent.data = url.toUri()
             startActivity(intent)
         }
-        // REMOVED wakeWordButton listener
     }
 
     @SuppressLint("SetTextI18n")
@@ -203,6 +202,7 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this@MainActivity, "Content Moderation Started", Toast.LENGTH_SHORT).show()
             }
         }
+
     }
 
     // REMOVED setupVisionModeListener()
@@ -210,6 +210,9 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("ClickableViewAccessibility")
     private fun setupVoiceInput() {
         voiceInputButton.setOnTouchListener { _, event ->
+            if (!permissionManager.isMicrophonePermissionGranted()) {
+                permissionManager.requestMicrophonePermission()
+            }
             when (event.action) {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     startVoiceInput()
@@ -260,6 +263,28 @@ class MainActivity : AppCompatActivity() {
             }
         )
     }
+
+    // New function to start the service
+    private fun setUpConversationalAgent() {
+        conversationalAgentButton.setOnClickListener {
+            if (!ConversationalAgentService.isRunning) {
+//                handler.postDelayed({ updateUI() }, 500)
+                Log.d("ConvAgent", "Checking")
+                Log.d("MainActivity", "Permission granted, starting ConversationalAgentService.")
+                val serviceIntent = Intent(this, ConversationalAgentService::class.java)
+                ContextCompat.startForegroundService(this, serviceIntent)
+                Toast.makeText(this, "Conversation agent is active", Toast.LENGTH_SHORT).show()
+                handler.postDelayed({ updateUI() }, 100)
+            }else{
+                Log.d("MainActivity", "Stopping ConversationalAgentService.")
+                stopService(Intent(this, ConversationalAgentService::class.java))
+                Toast.makeText(this, "Conversation ended", Toast.LENGTH_SHORT).show()
+                handler.postDelayed({ updateUI() }, 100)
+            }
+        }
+
+    }
+
 
     private fun performTaskFromVoiceInput(instruction: String) {
         // ... (this logic remains unchanged)
@@ -319,12 +344,13 @@ class MainActivity : AppCompatActivity() {
     private fun executeTask(instruction: String) {
         // ... (this logic remains unchanged, but you might want to pass vision mode from settings)
         // For now, it defaults to what was previously hardcoded behavior.
-        val visionMode = VisionMode.XML.name // Defaulting to XML, as the control is now moved.
+         val visionMode = if (xmlModeRadio.isChecked) VisionMode.XML.name else VisionMode.SCREENSHOT.name
 
         lifecycleScope.launch {
             try {
                 val announcement = "I will now perform the task"
                 ttsManager.speakText(announcement)
+
                 delay(1000)
                 Log.d("MainActivity", "This is a UI Task. Starting AgentTaskService.")
                 statusText.text = "Agent started to perform task..."
@@ -335,6 +361,7 @@ class MainActivity : AppCompatActivity() {
                 startService(serviceIntent)
                 val fin = Finger(this@MainActivity)
                 fin.home()
+
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error executing task", e)
                 val errorMessage = "Error executing task: ${e.message}"
@@ -368,27 +395,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
-        // ... (this logic remains unchanged)
-        val service = packageName + "/" + ScreenInteractionService::class.java.canonicalName
-        val accessibilityEnabled = Settings.Secure.getInt(
-            applicationContext.contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED, 0
-        )
-        if (accessibilityEnabled == 1) {
-            val settingValue = Settings.Secure.getString(
-                applicationContext.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            )
-            if (settingValue != null) {
-                val splitter = TextUtils.SimpleStringSplitter(':')
-                splitter.setString(settingValue)
-                while (splitter.hasNext()) {
-                    val componentName = splitter.next()
-                    if (componentName.equals(service, ignoreCase = true)) {
-                        return true
-                    }
-                }
-            }
-        }
-        return false
+        return permissionManager.isAccessibilityServiceEnabled()
     }
 
     @SuppressLint("SetTextI18n")
@@ -424,5 +431,6 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
             startActivity(intent)
         }
+
     }
 }
