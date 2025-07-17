@@ -1,5 +1,6 @@
 package com.example.blurr
 
+import android.R
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.animation.ValueAnimator
@@ -28,6 +29,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
+import com.example.blurr.crawler.SemanticParser
 import com.example.blurr.utilities.TTSManager
 import com.example.blurr.utilities.TtsVisualizer
 import kotlinx.coroutines.Dispatchers
@@ -372,7 +374,7 @@ class ScreenInteractionService : AccessibilityService() {
                 viewsToRemove.forEach { view ->
                     if (view.isAttachedToWindow) windowManager.removeView(view)
                 }
-            }, 3000L)
+            }, 10000L)
         }
     }
 
@@ -486,7 +488,29 @@ class ScreenInteractionService : AccessibilityService() {
                 serializer.endDocument()
 
                 val rawXml = stringWriter.toString()
+                logLongString("rawXml", rawXml)
 
+                // Get screen dimensions
+                val screenWidth: Int
+                val screenHeight: Int
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val windowMetrics = windowManager?.currentWindowMetrics
+                    val insets = windowMetrics?.windowInsets?.getInsetsIgnoringVisibility(android.view.WindowInsets.Type.systemBars())
+                    screenWidth = windowMetrics?.bounds?.width() ?: 0
+                    screenHeight = windowMetrics?.bounds?.height() ?: 0
+                } else {
+                    val display = windowManager?.defaultDisplay
+                    val size = Point()
+                    display?.getSize(size)
+                    screenWidth = size.x
+                    screenHeight = size.y
+                }
+
+
+
+                val semanticParser = SemanticParser(this@ScreenInteractionService)
+                val simplifiedJson = semanticParser.parse(rawXml, screenWidth, screenHeight)
+                Log.d("APPMAP", "Screen Width: $screenWidth, Screen Height: $screenHeight\n$simplifiedJson")
                 // 1. Parse the raw XML into a structured list.
                 val simplifiedElements = parseXmlToSimplifiedElements(rawXml)
                 println("SIZEEEE : " + simplifiedElements.size)

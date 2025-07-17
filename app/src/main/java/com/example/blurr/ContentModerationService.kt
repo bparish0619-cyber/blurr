@@ -143,8 +143,11 @@ class ContentModerationService : Service() {
             val judge = Judge()
             val init = judge.initChat()
             val xml = eyes.openXMLEyes()
-            println(xml);
+            Log.d("ModerationService", "XML content:\n$xml")
             val pro = judge.getPrompt(inst, xml, true)
+            Log.d("ModerationService", "Generated Prompt:\n$pro")
+
+
 
             // Check if the screenshot was captured successfully
             if (screenshotBitmap != null) {
@@ -168,8 +171,8 @@ class ContentModerationService : Service() {
                 val output = getReasoningModelApiResponse(combined, apiKey = API_KEY)
                 val parsed = judge.parseResponse(output.toString())
 
-                println("JUDGEMENT: ${parsed["judgement"]}")
-                println("REASON: ${parsed["reason"]}")
+                Log.d("ModerationService", "JUDGEMENT: ${parsed["judgement"]}")
+                Log.d("ModerationService", "REASON: ${parsed["reason"]}")
 
                 // 5. Act on the result
                 if (parsed["judgement"]?.isNotEmpty() == true && parsed["judgement"]?.uppercase() == "B") {
@@ -188,7 +191,7 @@ class ContentModerationService : Service() {
                 Log.d("ModerationService", "Next moderation cycle scheduled in 8 seconds.")
         }
 
-        println("Total time: ${System.currentTimeMillis() - startTime}ms")
+        Log.d("ModerationService", "Total time: ${System.currentTimeMillis() - startTime}ms")
     }
 
     @RequiresApi(Build.VERSION_CODES.O)

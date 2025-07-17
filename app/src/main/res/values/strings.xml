@@ -30,12 +30,12 @@
     <string name="dialogue_cancelled">Dialogue cancelled</string>
     <string name="submit_answer">Submit Answer</string>
     <string name="cancel">Cancel</string>
-    <string name="type_answer_here">Type your answer here...</string>
+    <string name="type_answer_here">Type your answer here…</string>
     <string name="or_use_voice_input">Or use voice input</string>
     <string name="enable_wake_word">ENABLE WAKE WORD</string>
     <string name="wake_word_engine">Wake Word Engine</string>
-    <string name="stt_engine">STT Engine (Panda)</string>
-    <string name="porcupine_engine">Porcupine Engine (Panda)</string>
+    <string name="stt_engine">STT Engine</string>
+    <string name="porcupine_engine">Porcupine Engine (Recommended)</string>
     <string name="select_wake_word_engine">Select Wake Word Engine</string>
     <string name="wake_word_enabled">Wake Word enabled with %s</string>
     <string name="wake_word_disabled">Disable Wake Word</string>
