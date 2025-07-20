@@ -87,6 +87,10 @@
             android:name=".services.AgentTaskService"
             android:exported="false"
             android:foregroundServiceType="specialUse" />
+        <service
+        android:name=".crawler.AgentService"
+        android:exported="false"
+        android:foregroundServiceType="specialUse" />
 
         <service android:name=".services.WakeWordService"
             android:enabled="true"
@@ -94,6 +98,11 @@
             android:foregroundServiceType="specialUse" />
 
         <service android:name=".services.EnhancedWakeWordService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
+        <service android:name=".crawler.CrawlerService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse" />

@@ -49,6 +49,27 @@ class DebugOverlayDrawer(private val context: Context) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val mainHandler = Handler(Looper.getMainLooper())
     private var statusBarHeight = -1
+    private val addedViews = mutableListOf<View>() // IMPORTANT: Tracks all added views
+
+    /**
+     * Removes all previously drawn overlays from the screen.
+     * This must be called before drawing a new set of overlays to prevent crashes.
+     */
+    fun clearOverlays() {
+        // Post to the main thread handler to ensure UI operations are safe
+        mainHandler.post {
+            for (view in addedViews) {
+                try {
+                    if (view.isAttachedToWindow) {
+                        windowManager.removeView(view)
+                    }
+                } catch (e: Exception) {
+                    Log.e("DebugOverlayDrawer", "Failed to remove a debug view.", e)
+                }
+            }
+            addedViews.clear()
+        }
+    }
 
     /**
      * Draws labeled bounding boxes for each UIElement on the screen.
@@ -58,6 +79,7 @@ class DebugOverlayDrawer(private val context: Context) {
      * @param durationMs The time in milliseconds for the boxes to remain on screen.
      */
     fun drawLabeledBoxes(elements: List<UIElement>, durationMs: Long = 5000L) {
+        clearOverlays()
         // This check is crucial. The function will not work without the overlay permission.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
             Log.w("DebugOverlayDrawer", "Cannot draw bounding boxes: 'Draw over other apps' permission not granted.")
@@ -83,12 +105,14 @@ class DebugOverlayDrawer(private val context: Context) {
                     val boxView = createBoxView(element)
                     val boxParams = createBoxLayoutParams(bounds)
                     windowManager.addView(boxView, boxParams)
+                    addedViews.add(boxView) // Track the view so it can be removed later
                     viewsToRemove.add(boxView)
 
                     // --- Create and add the Label View ---
                     val labelView = createLabelView(element)
                     val labelParams = createLabelLayoutParams(bounds)
                     windowManager.addView(labelView, labelParams)
+                    addedViews.add(labelView)
                     viewsToRemove.add(labelView)
 
                 } catch (e: Exception) {

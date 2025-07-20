@@ -18,6 +18,7 @@ import kotlin.math.min
  * into their interactive parents and then prunes nested interactive elements.
  */
 class SemanticParser(private  val applicationContext: Context) {
+    private val overlayDrawer = DebugOverlayDrawer(applicationContext)
 
     // Internal data class to represent the XML tree structure.
     private data class XmlNode(
@@ -41,7 +42,27 @@ class SemanticParser(private  val applicationContext: Context) {
      * @param screenHeight The physical height of the device screen.
      * @return A JSON string representing a list of clean UIElements.
      */
-    fun parse(xmlString: String, screenWidth: Int, screenHeight: Int): String {
+    fun parse(xmlString: String, screenWidth: Int, screenHeight: Int): List<UIElement> {
+        // Step 1: Build the complete tree from the XML.
+        val rootNode = buildTreeFromXml(xmlString)
+
+        // Step 2: Perform the semantic merge (upward text propagation).
+        if (rootNode != null) {
+            mergeDescriptiveChildren(rootNode)
+        }
+
+        // Step 3: Flatten the tree to a preliminary list of important elements.
+        val preliminaryElements = mutableListOf<UIElement>()
+        if (rootNode != null) {
+            flattenAndFilter(rootNode, preliminaryElements, screenWidth, screenHeight)
+        }
+//        overlayDrawer.drawLabeledBoxes(preliminaryElements)
+
+        return preliminaryElements
+    }
+
+
+    fun parseToJson(xmlString: String, screenWidth: Int, screenHeight: Int): String {
         // Step 1: Build the complete tree from the XML.
         val rootNode = buildTreeFromXml(xmlString)
 
@@ -56,21 +77,13 @@ class SemanticParser(private  val applicationContext: Context) {
             flattenAndFilter(rootNode, preliminaryElements, screenWidth, screenHeight)
         }
 
-        visualizeCurrentScreen(applicationContext, preliminaryElements )
+//        overlayDrawer.drawLabeledBoxes(preliminaryElements)
 
-        // Step 5: Serialize the final list to a pretty JSON string.
         val gson = GsonBuilder().setPrettyPrinting().create()
         return gson.toJson(preliminaryElements)
     }
 
 
-    fun visualizeCurrentScreen(context: Context, elements: List<UIElement>) {
-        // Create an instance of the drawer
-        val overlayDrawer = DebugOverlayDrawer(context)
-
-        // Call the function to draw the boxes. They will disappear automatically.
-        overlayDrawer.drawLabeledBoxes(elements)
-    }
     /**
      * Traverses the XML and builds a tree of XmlNode objects, preserving the hierarchy.
      */
@@ -160,7 +173,6 @@ class SemanticParser(private  val applicationContext: Context) {
         if (isImportant && !node.isSubsumed) {
             // Add a check to ensure the element is within the visible screen bounds.
             val bounds = parseBounds(node.get("bounds"))
-            Log.d("DIM", "Bounds: $bounds, ${node.get("content-desc")}")
             if (bounds != null &&
 //                [2160,690][1080,878]
                bounds.left >= 0 && bounds.right <= screenWidth && // Horizontal check

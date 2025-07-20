@@ -54,6 +54,8 @@ android {
 
             val googleTtsApiKey = localProperties.getProperty("GOOGLE_TTS_API_KEY") ?: ""
             buildConfigField("String", "GOOGLE_TTS_API_KEY", "\"$googleTtsApiKey\"")
+            val anthropickey = localProperties.getProperty("ANTHROPIC_KEY") ?: ""
+            buildConfigField("String", "ANTHROPIC_KEY", "\"$anthropickey\"")
 
         }
         debug {
@@ -74,6 +76,8 @@ android {
             val googleTtsApiKey = localProperties.getProperty("GOOGLE_TTS_API_KEY") ?: ""
             buildConfigField("String", "GOOGLE_TTS_API_KEY", "\"$googleTtsApiKey\"")
             buildConfigField("String", "SHA1_FINGERPRINT", "\"$debugSha1\"")
+            val anthropickey = localProperties.getProperty("ANTHROPIC_KEY") ?: ""
+            buildConfigField("String", "ANTHROPIC_KEY", "\"$anthropickey\"")
 
         }
     }

@@ -8,6 +8,7 @@ import java.io.File
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.example.blurr.ScreenInteractionService
+import kotlinx.serialization.serializer
 
 class Eyes(context: Context) {
 
@@ -47,6 +48,19 @@ class Eyes(context: Context) {
         Log.d("AccessibilityController", "Requesting UI layout dump...")
         return service.dumpWindowHierarchy()
     }
+    /**
+     * Dumps the current UI layout to an XML file using the Accessibility Service.
+     */
+    @RequiresApi(Build.VERSION_CODES.O)
+    suspend fun openPureXMLEyes(): String {
+        val service = ScreenInteractionService.instance
+        if (service == null) {
+            Log.e("AccessibilityController", "Accessibility Service is not running!")
+            return "<hierarchy/>"
+        }
+        Log.d("AccessibilityController", "Requesting Pure UI layout dump...")
+        return service.dumpWindowHierarchyInXML()
+    }
 
     fun getKeyBoardStatus(): Boolean {
         val service = ScreenInteractionService.instance
@@ -55,5 +69,13 @@ class Eyes(context: Context) {
             return false
         }
         return service.isTypingAvailable()
+    }
+
+    /**
+     * Gets the last known activity name from the accessibility service.
+     * This is the ground truth for the current screen.
+     */
+    fun getCurrentActivityName(): String? {
+        return ScreenInteractionService.currentActivityName
     }
 }

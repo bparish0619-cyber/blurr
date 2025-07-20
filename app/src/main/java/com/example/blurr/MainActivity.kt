@@ -40,6 +40,8 @@ import com.example.blurr.services.WakeWordService
 import com.example.blurr.services.EnhancedWakeWordService
 import com.example.blurr.utilities.getReasoningModelApiResponse
 import android.view.View
+import com.example.blurr.crawler.AgentService
+import com.example.blurr.crawler.CrawlerService
 import com.example.blurr.services.AgentTaskService
 import com.example.blurr.utilities.PermissionManager
 
@@ -189,27 +191,44 @@ class MainActivity : AppCompatActivity() {
         }
 
         contentModerationButton.setOnClickListener {
-            if (!isAccessibilityServiceEnabled()) {
-                Toast.makeText(this, "Accessibility permission is required for content filtering.", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-            lifecycleScope.launch {
-                val instruction = contentModerationInputField.text.toString()
-                if (instruction.isBlank()) {
-                    Toast.makeText(this@MainActivity, "Please enter an instruction", Toast.LENGTH_SHORT).show()
-                    return@launch
+//            if (!isAccessibilityServiceEnabled()) {
+//                Toast.makeText(this, "Accessibility permission is required for content filtering.", Toast.LENGTH_LONG).show()
+//                return@setOnClickListener
+//            }
+//            lifecycleScope.launch {
+//                val instruction = contentModerationInputField.text.toString()
+//                if (instruction.isBlank()) {
+//                    Toast.makeText(this@MainActivity, "Please enter an instruction", Toast.LENGTH_SHORT).show()
+//                    return@launch
+//                }
+//
+//                val fin = Finger(this@MainActivity)
+//                fin.home()
+//                delay(1500)
+//
+//                Log.d("MainActivity", "Starting ContentModerationService after delay.")
+//                val serviceIntent = Intent(this@MainActivity, ContentModerationService::class.java).apply {
+//                    putExtra("MODERATION_INSTRUCTION", instruction)
+//                }
+//                startService(serviceIntent)
+//                Toast.makeText(this@MainActivity, "Content Moderation Started", Toast.LENGTH_SHORT).show()
+//            }
+//            lifecycleScope.launch {
+
+            lifecycleScope.launch{
+                delay(5000)
+                val serviceIntent = Intent(this@MainActivity, AgentService::class.java).apply {
+                    action = AgentService.ACTION_START_TASK
+                    putExtra("task_description", "Text ayush chaudhary on whatsapp warm happy birthday wish")
+                    putExtra("app_map_file", "combined_app_map.json")
                 }
 
-                val fin = Finger(this@MainActivity)
-                fin.home()
-                delay(1500)
-
-                Log.d("MainActivity", "Starting ContentModerationService after delay.")
-                val serviceIntent = Intent(this@MainActivity, ContentModerationService::class.java).apply {
-                    putExtra("MODERATION_INSTRUCTION", instruction)
+                // Use startForegroundService for modern Android versions
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(serviceIntent)
+                } else {
+                    startService(serviceIntent)
                 }
-                startService(serviceIntent)
-                Toast.makeText(this@MainActivity, "Content Moderation Started", Toast.LENGTH_SHORT).show()
             }
         }
 

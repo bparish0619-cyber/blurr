@@ -2,9 +2,13 @@ package com.example.blurr
 
 import android.R
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
 import android.animation.ValueAnimator
+import android.content.ComponentName
+import java.util.concurrent.atomic.AtomicReference // To hold the latest activity name
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.PixelFormat
@@ -44,6 +48,8 @@ import java.io.StringReader
 import java.io.StringWriter
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlin.coroutines.resumeWithException
 
 
@@ -57,10 +63,15 @@ private data class SimplifiedElement(
 )
 
 class ScreenInteractionService : AccessibilityService() {
+    private val lastActivityName: AtomicReference<String?> = AtomicReference(null)
 
+    private var screenshotButton: View? = null
+    private var screenshotCounter = 1
     companion object {
         var instance: ScreenInteractionService? = null
         const val ACTION_SCREENSHOT_TAKEN = "com.example.accessiblity_service_test.SCREENSHOT_TAKEN"
+        var currentActivityName: String? = null
+
         // A flag to easily toggle the debug taps on or off
         const val DEBUG_SHOW_TAPS = false
         // A flag to easily toggle the debug bounding boxes on or off
@@ -101,6 +112,7 @@ class ScreenInteractionService : AccessibilityService() {
     private var statusBarHeight = -1
 
 
+    @RequiresApi(Build.VERSION_CODES.R)
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
@@ -109,6 +121,17 @@ class ScreenInteractionService : AccessibilityService() {
 //        setupGlowEffect()
         setupAudioWaveEffect()
 //        setupWaveBorderEffect()
+        setupScreenshotButton() // ADD THIS LINE
+
+        val info = serviceInfo ?: AccessibilityServiceInfo()
+        info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
+                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED // Keep this for UI parsing
+        info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
+        info.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
+                AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
+                AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS // Crucial for rootInActiveWindow
+        info.packageNames = null // Listen to all packages, or specify
+        serviceInfo = info
     }
     /**
      * Gets the package name of the app currently in the foreground.
@@ -175,6 +198,116 @@ class ScreenInteractionService : AccessibilityService() {
             start()
         }
     }
+    private fun saveStringToFile(content: String, file: File) {
+        try {
+            // Ensure the parent directory exists
+            file.parentFile?.mkdirs()
+            // Write the text content to the file
+            file.writeText(content)
+            Log.d("InteractionService", "JSON saved to ${file.absolutePath}")
+        } catch (e: Exception) {
+            Log.e("InteractionService", "Failed to save string to file.", e)
+        }
+    }
+    /**
+     * Creates and displays a floating button to capture screenshots and UI data.
+     */
+    @RequiresApi(Build.VERSION_CODES.R) // Required for captureScreenshot()
+    private fun setupScreenshotButton() {
+        // Avoid adding the button if it already exists or if permission is denied
+        if (screenshotButton != null || !Settings.canDrawOverlays(this)) {
+            if (!Settings.canDrawOverlays(this)) {
+                Log.w("InteractionService", "Cannot show screenshot button: 'Draw over other apps' permission not granted.")
+            }
+            return
+        }
+
+        // Create an ImageView to act as our button
+        val button = ImageView(this).apply {
+            setImageResource(android.R.drawable.ic_menu_camera)
+            setBackgroundColor(0x99000000.toInt()) // Semi-transparent black background
+            val padding = 32
+            setPadding(padding, padding, padding, padding)
+
+            // Set the click listener to trigger the screenshot and JSON capture logic
+            setOnClickListener {
+                CoroutineScope(Dispatchers.Main).launch {
+                    // --- Get Screenshot and UI Hierarchy ---
+                    val bitmap = captureScreenshot()
+                    val rawXML = dumpWindowHierarchyInXML()
+
+                    if (bitmap != null) {
+                        // --- Get Screen Dimensions ---
+                        val screenWidth: Int
+                        val screenHeight: Int
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            val windowMetrics = windowManager?.currentWindowMetrics
+                            screenWidth = windowMetrics?.bounds?.width() ?: 0
+                            screenHeight = windowMetrics?.bounds?.height() ?: 0
+                        } else {
+                            val display = windowManager?.defaultDisplay
+                            val size = Point()
+                            display?.getSize(size)
+                            screenWidth = size.x
+                            screenHeight = size.y
+                        }
+
+                        // --- 1. Get the JSON string from your parser ---
+                        // Note: This assumes your `parseToJson` method returns the JSON String.
+                        val sp = SemanticParser(this@ScreenInteractionService)
+                        val jsonString = sp.parseToJson(rawXML, screenWidth, screenHeight)
+
+                        // --- 2. Save the screenshot (.png file) ---
+                        val imageFile = File(getExternalFilesDir(null), "${screenshotCounter}.png")
+                        saveBitmapToFile(bitmap, imageFile)
+                        Log.d("InteractionService", "Screenshot saved: ${imageFile.name}")
+
+                        // --- 3. Save the JSON data (.json file) ---
+                        val jsonFile = File(getExternalFilesDir(null), "${screenshotCounter}.json")
+                        saveStringToFile(jsonString, jsonFile)
+
+                        // --- 4. Increment counter AFTER both files are saved ---
+                        screenshotCounter++
+                    }
+                }
+            }
+        }
+        this.screenshotButton = button
+
+        // Define the layout parameters for the floating button
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.END
+            x = 20
+            y = 100
+        }
+
+        // Add the button to the window on the main UI thread
+        Handler(Looper.getMainLooper()).post {
+            windowManager?.addView(screenshotButton, params)
+            Log.d("InteractionService", "Screenshot button added to screen.")
+        }
+    }
+    /**
+     * Removes the floating screenshot button from the screen.
+     */
+    private fun hideScreenshotButton() {
+        Handler(Looper.getMainLooper()).post {
+            screenshotButton?.let {
+                if (it.isAttachedToWindow) {
+                    windowManager?.removeView(it)
+                }
+            }
+            screenshotButton = null
+        }
+    }
+
+
     /**
      * NEW: Creates and displays the glowing border overlay.
      */
@@ -488,7 +621,6 @@ class ScreenInteractionService : AccessibilityService() {
                 serializer.endDocument()
 
                 val rawXml = stringWriter.toString()
-                logLongString("rawXml", rawXml)
 
                 // Get screen dimensions
                 val screenWidth: Int
@@ -508,9 +640,15 @@ class ScreenInteractionService : AccessibilityService() {
 
 
 
-                val semanticParser = SemanticParser(this@ScreenInteractionService)
-                val simplifiedJson = semanticParser.parse(rawXml, screenWidth, screenHeight)
-                Log.d("APPMAP", "Screen Width: $screenWidth, Screen Height: $screenHeight\n$simplifiedJson")
+//                val semanticParser = SemanticParser(this@ScreenInteractionService)
+//                val simplifiedJson = semanticParser.parse(rawXml, screenWidth, screenHeight)
+//
+//                val screenIdentifier = ScreenIdentifier()
+//                val screenName = screenIdentifier.identifyScreen(simplifiedJson, emptyList())
+//
+//                Log.d("APPMAP", screenName.toString())
+//
+
                 // 1. Parse the raw XML into a structured list.
                 val simplifiedElements = parseXmlToSimplifiedElements(rawXml)
                 println("SIZEEEE : " + simplifiedElements.size)
@@ -521,6 +659,34 @@ class ScreenInteractionService : AccessibilityService() {
 
                 // 3. Format the structured list into the final string for the LLM.
                 return@withContext formatElementsForLlm(simplifiedElements)
+
+            } catch (e: Exception) {
+                Log.e("InteractionService", "Error dumping or transforming UI hierarchy", e)
+                return@withContext "Error processing UI."
+            }
+        }
+    }
+
+    suspend fun dumpWindowHierarchyInXML(): String {
+        return withContext(Dispatchers.Default) {
+            val rootNode = rootInActiveWindow ?: run {
+                Log.e("InteractionService", "Root node is null, cannot dump hierarchy.")
+                return@withContext "Error: UI hierarchy is not available."
+            }
+
+            val stringWriter = StringWriter()
+            try {
+                val serializer: XmlSerializer = Xml.newSerializer()
+                serializer.setOutput(stringWriter)
+                serializer.startDocument("UTF-8", true)
+                serializer.startTag(null, "hierarchy")
+                dumpNode(rootNode, serializer, 0)
+                serializer.endTag(null, "hierarchy")
+                serializer.endDocument()
+
+                val rawXml = stringWriter.toString()
+
+                return@withContext rawXml
 
             } catch (e: Exception) {
                 Log.e("InteractionService", "Error dumping or transforming UI hierarchy", e)
@@ -564,7 +730,24 @@ class ScreenInteractionService : AccessibilityService() {
         serializer.endTag(null, "node")
     }
 
+    private fun isActivity(componentName: ComponentName): Boolean {
+        return try {
+            packageManager.getActivityInfo(componentName, 0) != null
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        }
+    }
+    override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val packageName = event.packageName?.toString()
+            val className = event.className?.toString()
 
+            if (!packageName.isNullOrBlank() && !className.isNullOrBlank()) {
+                currentActivityName = ComponentName(packageName, className).flattenToString()
+                Log.d("AccessibilityService", "Current Activity Updated: $currentActivityName")
+            }
+        }
+    }
     fun logLongString(tag: String, message: String) {
         val maxLogSize = 2000 // Split into chunks of 2000 characters
         for (i in 0..message.length / maxLogSize) {
@@ -575,9 +758,7 @@ class ScreenInteractionService : AccessibilityService() {
         }
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // We are triggering actions proactively, so we don't need to react to events.
-    }
+
 
     override fun onInterrupt() {
         Log.e("InteractionService", "Accessibility Service interrupted.")

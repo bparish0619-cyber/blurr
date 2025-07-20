@@ -17,8 +17,8 @@ data class AppMetadata(
 )
 
 data class Screen(
-    val screen_id: String, // e.g., a hash of the element structure or activity name
-    val ui_elements: List<UIElement>
+    val screenId: String,
+    val elements: List<UIElement>,
 )
 
 data class UIElement(
@@ -30,5 +30,5 @@ data class UIElement(
     val is_clickable: Boolean,
     val is_long_clickable: Boolean,
     val is_password: Boolean,
-    @Transient var isPruned: Boolean = false // Helper field for pruning, excluded from JSON
+    var leadsToScreen: String? = null
 )
