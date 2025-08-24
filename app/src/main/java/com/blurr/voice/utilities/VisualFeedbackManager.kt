@@ -35,6 +35,7 @@ class VisualFeedbackManager private constructor(private val context: Context) {
     private var transcriptionView: TextView? = null
     private var inputBoxView: View? = null
 
+    private var speakingOverlay: View? = null
 
     companion object {
         private const val TAG = "VisualFeedbackManager"
@@ -73,6 +74,8 @@ class VisualFeedbackManager private constructor(private val context: Context) {
             ttsVisualizer?.stop()
             ttsVisualizer = null
             TTSManager.getInstance(context).utteranceListener = null
+            hideSpeakingOverlay()
+
             Log.d(TAG, "Audio wave effect has been torn down.")
         }
     }
@@ -123,6 +126,34 @@ class VisualFeedbackManager private constructor(private val context: Context) {
         }
         Log.d(TAG, "Audio wave effect has been set up.")
     }
+
+    fun showSpeakingOverlay() {
+        mainHandler.post {
+            if (speakingOverlay != null) return@post
+
+            speakingOverlay = View(context).apply {
+                // CHANGED: Increased opacity from 80 (50%) to E6 (90%) for a more solid feel.
+                // You can adjust this hex value (E6) to your liking.
+                setBackgroundColor(0x80FFFFFF.toInt())
+            }
+
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                PixelFormat.TRANSLUCENT
+            )
+
+            try {
+                windowManager.addView(speakingOverlay, params)
+                Log.d(TAG, "Speaking overlay added.")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error adding speaking overlay", e)
+            }
+        }
+    }
+
 
     fun showTranscription(initialText: String = "Listening...") {
         if (transcriptionView != null) {
@@ -193,7 +224,8 @@ class VisualFeedbackManager private constructor(private val context: Context) {
     @SuppressLint("ClickableViewAccessibility")
     fun showInputBox(
         onActivated: () -> Unit,
-        onSubmit: (String) -> Unit
+        onSubmit: (String) -> Unit,
+        onOutsideTap: () -> Unit
     ) {
         mainHandler.post {
             if (inputBoxView?.isAttachedToWindow == true) {
@@ -217,9 +249,9 @@ class VisualFeedbackManager private constructor(private val context: Context) {
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                // You need it to be focusable to receive key events.
-                // The absence of FLAG_NOT_FOCUSABLE makes it focusable by default.
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.BOTTOM
@@ -264,7 +296,8 @@ class VisualFeedbackManager private constructor(private val context: Context) {
 
             rootLayout?.setOnTouchListener { _, event ->
                 if (event.action == MotionEvent.ACTION_OUTSIDE) {
-                    hideInputBox()
+                    Log.d(TAG, "Outside touch detected.")
+                    onOutsideTap() // Use the new callback
                     return@setOnTouchListener true
                 }
                 false
@@ -293,6 +326,21 @@ class VisualFeedbackManager private constructor(private val context: Context) {
                 }
             }
             inputBoxView = null
+        }
+    }
+    fun hideSpeakingOverlay() {
+        mainHandler.post {
+            speakingOverlay?.let {
+                if (it.isAttachedToWindow) {
+                    try {
+                        windowManager.removeView(it)
+                        Log.d(TAG, "Speaking overlay removed.")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error removing speaking overlay", e)
+                    }
+                }
+            }
+            speakingOverlay = null
         }
     }
 }

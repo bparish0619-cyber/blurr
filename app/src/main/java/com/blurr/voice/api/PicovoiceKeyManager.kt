@@ -26,7 +26,8 @@ class PicovoiceKeyManager(private val context: Context) {
         private const val TAG = "PicovoiceKeyManager"
         private const val PREFS_NAME = "PicovoicePrefs"
         private const val KEY_ACCESS_KEY = "access_key"
-        
+        // Inside companion object
+        private const val KEY_USER_PROVIDED_KEY = "user_provided_access_key"
         private const val API_URL = BuildConfig.GCLOUD_GATEWAY_URL
         private const val API_KEY_HEADER = "x-api-key"
         private const val API_KEY_VALUE = BuildConfig.GCLOUD_GATEWAY_PICOVOICE_KEY
@@ -44,6 +45,11 @@ class PicovoiceKeyManager(private val context: Context) {
      */
     suspend fun getAccessKey(): String? = withContext(Dispatchers.IO) {
         try {
+            val userKey = getUserProvidedKey()
+            if (!userKey.isNullOrBlank()) {
+                Log.d(TAG, "Using user-provided Picovoice access key")
+                return@withContext userKey
+            }
             // Check if we have a cached key
             val cachedKey = getCachedAccessKey()
             if (cachedKey != null) {
@@ -150,5 +156,21 @@ class PicovoiceKeyManager(private val context: Context) {
             remove(KEY_ACCESS_KEY)
         }
         Log.d(TAG, "Cleared cached Picovoice access key")
+    }
+
+    /**
+     * Saves a key provided by the user to SharedPreferences.
+     */
+    fun saveUserProvidedKey(accessKey: String) {
+        sharedPreferences.edit {
+            putString(KEY_USER_PROVIDED_KEY, accessKey)
+        }
+    }
+
+    /**
+     * Gets the key provided by the user from SharedPreferences.
+     */
+    fun getUserProvidedKey(): String? {
+        return sharedPreferences.getString(KEY_USER_PROVIDED_KEY, null)
     }
 } 
