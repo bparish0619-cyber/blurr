@@ -12,8 +12,6 @@ Apply for the closed test: [google form](https://docs.google.com/forms/d/e/1FAIp
 #### 5 task demo: 
 https://github.com/user-attachments/assets/cf76bb00-2bf4-4274-acad-d9f4c0d47188
 
-#### Text My Brother Happy Birthday
-https://github.com/user-attachments/assets/bac5726a-64b3-4cbf-b116-0ebc369bcec0
 
 **Panda** is a proactive, on-device AI agent for Android that autonomously understands natural language commands and operates your phone's UI to achieve them. Inspired by the need to make modern technology more accessible, Panda acts as your personal operator, capable of handling complex, multi-step tasks across different applications.
 
