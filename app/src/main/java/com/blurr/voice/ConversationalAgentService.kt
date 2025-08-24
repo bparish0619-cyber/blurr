@@ -98,6 +98,7 @@ class ConversationalAgentService : Service() {
         usedMemories.clear() // Clear used memories for new conversation
         visualFeedbackManager.showTtsWave()
         showInputBoxIfNeeded()
+        visualFeedbackManager.showSpeakingOverlay() // <-- ADD THIS LINE
 
 
     }
@@ -115,6 +116,11 @@ class ConversationalAgentService : Service() {
                 // This is the existing callback for when text is submitted
                 processUserInput(submittedText)
             },
+            onOutsideTap = {
+                serviceScope.launch {
+                    instantShutdown()
+                }
+            }
         )
     }
 
@@ -694,6 +700,9 @@ class ConversationalAgentService : Service() {
     }
 
     private suspend fun gracefulShutdown(exitMessage: String? = null) {
+        visualFeedbackManager.hideTtsWave()
+        visualFeedbackManager.hideTranscription()
+        visualFeedbackManager.hideSpeakingOverlay()
         visualFeedbackManager.hideInputBox()
 
         if (exitMessage != null) {
@@ -710,6 +719,32 @@ class ConversationalAgentService : Service() {
 
     }
 
+    /**
+     * Immediately stops all TTS, STT, and background tasks, hides all UI, and stops the service.
+     * This is used for forceful termination, like an outside tap.
+     */
+    private suspend fun instantShutdown() {
+        // We use the mainHandler to ensure these operations run on the UI thread.
+//        mainHandler.post {
+            Log.d("ConvAgent", "Instant shutdown triggered by user.")
+            speechCoordinator.stopSpeaking()
+            speechCoordinator.stopListening()
+            visualFeedbackManager.hideTtsWave()
+            visualFeedbackManager.hideTranscription()
+            visualFeedbackManager.hideSpeakingOverlay()
+            visualFeedbackManager.hideInputBox()
+
+            removeClarificationQuestions()
+            // Make a thread-safe copy of the conversation history.
+            if (conversationHistory.size > 1) {
+                Log.d("ConvAgent", "Extracting memories before shutdown.")
+                MemoryExtractor.extractAndStoreMemories(conversationHistory, memoryManager, usedMemories)
+            }
+            serviceScope.cancel("User tapped outside, forcing instant shutdown.")
+
+            stopSelf()
+//        }
+    }
     override fun onDestroy() {
         super.onDestroy()
         Log.d("ConvAgent", "Service onDestroy")
@@ -717,6 +752,7 @@ class ConversationalAgentService : Service() {
         serviceScope.cancel()
         ttsManager.setCaptionsEnabled(false)
         isRunning = false
+        visualFeedbackManager.hideSpeakingOverlay() // <-- ADD THIS LINE
         // USE the new manager to hide the wave and transcription view
         visualFeedbackManager.hideTtsWave()
         visualFeedbackManager.hideTranscription()

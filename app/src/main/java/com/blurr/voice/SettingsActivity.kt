@@ -15,6 +15,7 @@ import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
 import com.blurr.voice.agent.v1.VisionMode
 import com.blurr.voice.api.GoogleTts
+import com.blurr.voice.api.PicovoiceKeyManager
 import com.blurr.voice.api.TTSVoice
 import com.blurr.voice.utilities.SpeechCoordinator
 import com.blurr.voice.utilities.VoicePreferenceManager
@@ -35,6 +36,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var visionModeDescription: TextView
     private lateinit var editUserName: android.widget.EditText
     private lateinit var editUserEmail: android.widget.EditText
+    private lateinit var editWakeWordKey: android.widget.EditText
+    private lateinit var buttonSaveWakeWordKey: Button
 
     private lateinit var sc: SpeechCoordinator
     private lateinit var sharedPreferences: SharedPreferences
@@ -78,6 +81,8 @@ class SettingsActivity : AppCompatActivity() {
         backButton = findViewById(R.id.id_backButtonSettings)
         permissionsInfoButton = findViewById(R.id.permissionsInfoButton)
         visionModeGroup = findViewById(R.id.visionModeGroup)
+        editWakeWordKey = findViewById(R.id.editWakeWordKey)
+        buttonSaveWakeWordKey = findViewById(R.id.buttonSaveWakeWordKey)
         visionModeDescription = findViewById(R.id.visionModeDescription)
         editUserName = findViewById(R.id.editUserName)
         editUserEmail = findViewById(R.id.editUserEmail)
@@ -106,6 +111,12 @@ class SettingsActivity : AppCompatActivity() {
         permissionsInfoButton.setOnClickListener {
             val intent = Intent(this, PermissionsActivity::class.java)
             startActivity(intent)
+        }
+        buttonSaveWakeWordKey.setOnClickListener {
+            val userKey = editWakeWordKey.text.toString().trim()
+            val keyManager = PicovoiceKeyManager(this)
+            keyManager.saveUserProvidedKey(userKey) // You will create this method next
+            Toast.makeText(this, "Wake word key saved.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -192,6 +203,10 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun loadAllSettings() {
+
+        // Inside loadAllSettings()
+        val keyManager = PicovoiceKeyManager(this)
+        editWakeWordKey.setText(keyManager.getUserProvidedKey() ?: "") // You will create this method next
         val savedVoiceName = sharedPreferences.getString(KEY_SELECTED_VOICE, DEFAULT_VOICE.name)
         val savedVoice = availableVoices.find { it.name == savedVoiceName } ?: DEFAULT_VOICE
         ttsVoicePicker.value = availableVoices.indexOf(savedVoice)
