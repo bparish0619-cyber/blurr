@@ -3,6 +3,7 @@ package com.blurr.voice
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
@@ -38,6 +39,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var editUserEmail: android.widget.EditText
     private lateinit var editWakeWordKey: android.widget.EditText
     private lateinit var buttonSaveWakeWordKey: Button
+    private lateinit var textGetPicovoiceKeyLink: TextView // NEW: Declare the TextView for the link
+
 
     private lateinit var sc: SpeechCoordinator
     private lateinit var sharedPreferences: SharedPreferences
@@ -86,6 +89,8 @@ class SettingsActivity : AppCompatActivity() {
         visionModeDescription = findViewById(R.id.visionModeDescription)
         editUserName = findViewById(R.id.editUserName)
         editUserEmail = findViewById(R.id.editUserEmail)
+        textGetPicovoiceKeyLink = findViewById(R.id.textGetPicovoiceKeyLink) // NEW: Initialize the TextView
+
 
         setupClickListeners()
         setupVoicePicker()
@@ -117,6 +122,18 @@ class SettingsActivity : AppCompatActivity() {
             val keyManager = PicovoiceKeyManager(this)
             keyManager.saveUserProvidedKey(userKey) // You will create this method next
             Toast.makeText(this, "Wake word key saved.", Toast.LENGTH_SHORT).show()
+        }
+        textGetPicovoiceKeyLink.setOnClickListener {
+            val url = "https://console.picovoice.ai/login"
+            val intent = Intent(Intent.ACTION_VIEW)
+            intent.data = Uri.parse(url)
+            try {
+                startActivity(intent)
+            } catch (e: Exception) {
+                // This might happen if the device has no web browser
+                Toast.makeText(this, "Could not open link. No browser found.", Toast.LENGTH_SHORT).show()
+                Log.e("SettingsActivity", "Failed to open Picovoice link", e)
+            }
         }
     }
 

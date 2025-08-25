@@ -12,6 +12,8 @@
     <string name="grant_accessibility_permission">Grant Accessibility Permission</string>
     <string name="permission_not_granted">Permission: Not Granted</string>
     <string name="service_status_stopped">Service Status: Stopped</string>
+    <string name="wake_word_help_link"><u>Wake word not initializing? Open me!</u></string>
+
     <string name="vision_mode">Vision Mode:</string>
     <string name="xml_mode">XML Mode</string>
     <string name="screenshot_mode">Screenshot Mode</string>

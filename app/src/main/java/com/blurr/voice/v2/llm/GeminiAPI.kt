@@ -14,6 +14,11 @@ import com.google.ai.client.generativeai.type.ServerException
 import com.google.ai.client.generativeai.type.content
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.seconds
 
@@ -170,6 +175,74 @@ class GeminiApi(
             }
         }
     }
+
+    /**
+     * WORKAROUND: Generates content using a direct REST API call to enable Google Search grounding.
+     * This should be used for queries requiring real-time information until the Kotlin SDK
+     * officially supports the search tool.
+     *
+     * @param prompt The user's text prompt.
+     * @return The generated text content as a String, or null on failure.
+     */
+    suspend fun generateGroundedContent(prompt: String): String? {
+        val apiKey = apiKeyManager.getNextKey() // Reuse your existing key manager
+        val client = OkHttpClient()
+        val mediaType = "application/json; charset=utf-8".toMediaType()
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent"
+
+        // 1. Manually construct the JSON body to include the "google_search" tool
+        val jsonBody = """
+        {
+          "contents": [
+            {
+              "parts": [
+                {"text": "$prompt"}
+              ]
+            }
+          ],
+          "tools": [
+            {
+              "google_search": {}
+            }
+          ]
+        }
+    """.trimIndent()
+
+        val requestBody = jsonBody.toRequestBody(mediaType)
+
+        val request = Request.Builder()
+            .url(url)
+            .post(requestBody)
+            .addHeader("x-goog-api-key", apiKey)
+            .build()
+
+        return try {
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string()
+
+            if (!response.isSuccessful || responseBody == null) {
+                Log.e(TAG, "Grounded API call failed with code: ${response.code}, body: $responseBody")
+                return null
+            }
+
+            // 2. Parse the JSON response to extract the model's text output
+            val text = JSONObject(responseBody)
+                .getJSONArray("candidates")
+                .getJSONObject(0)
+                .getJSONObject("content")
+                .getJSONArray("parts")
+                .getJSONObject(0)
+                .getString("text")
+
+            Log.d(TAG, "Successfully received grounded response.")
+            text
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception during grounded API call", e)
+            null
+        }
+    }
+
 }
 
 /**
