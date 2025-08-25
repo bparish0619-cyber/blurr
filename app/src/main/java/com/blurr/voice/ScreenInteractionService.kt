@@ -32,6 +32,7 @@ import androidx.core.content.ContextCompat
 import com.blurr.voice.utilities.TTSManager
 import com.blurr.voice.utilities.TtsVisualizer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
@@ -752,24 +753,44 @@ class ScreenInteractionService : AccessibilityService() {
         return Pair(width, height)
     }
 
-    /**
-     * A new, powerful function to get all necessary screen data in one go.
-     */
     @RequiresApi(Build.VERSION_CODES.R)
     suspend fun getScreenAnalysisData(): RawScreenData {
-
         val (screenWidth, screenHeight) = getScreenDimensions()
-        val rootNode = rootInActiveWindow ?: return RawScreenData("<hierarchy/>", 0, 0, screenWidth,screenHeight)
+        val maxRetries = 5
+        val retryDelay = 800L // 200 milliseconds
 
-        // 1. Get scroll info by traversing the live nodes
-        val (pixelsAbove, pixelsBelow) = findScrollableNodeAndGetInfo(rootNode)
+        for (attempt in 1..maxRetries) {
+            // Attempt to get the root node in each iteration.
+            val rootNode = rootInActiveWindow
 
-        // 2. Get the XML dump (using your existing dumpWindowHierarchy function)
-        val xmlString = dumpWindowHierarchy(true)
+            if (rootNode != null) {
+                // --- SUCCESS PATH ---
+                // If the root node is available, proceed with the analysis and return.
+                Log.d("InteractionService", "Got rootInActiveWindow on attempt $attempt.")
 
-        return RawScreenData(xmlString, pixelsAbove, pixelsBelow, screenWidth, screenHeight)
+                // 1. Get scroll info by traversing the live nodes
+                val (pixelsAbove, pixelsBelow) = findScrollableNodeAndGetInfo(rootNode)
+
+                // 2. Get the XML dump
+                val xmlString = dumpWindowHierarchy(true)
+                // Return the complete data, exiting the function successfully.
+                return RawScreenData(xmlString, pixelsAbove, pixelsBelow, screenWidth, screenHeight)
+            }
+
+            // --- RETRY PATH ---
+            // If the root node is null and this isn't the last attempt, wait and retry.
+            if (attempt < maxRetries) {
+                Log.d("InteractionService", "rootInActiveWindow is null on attempt $attempt. Retrying in ${retryDelay}ms...")
+                delay(retryDelay)
+            }
+        }
+
+        // --- FAILURE PATH ---
+        // If the loop completes, all retries have failed.
+        Log.e("InteractionService", "Failed to get rootInActiveWindow after $maxRetries attempts.")
+        // Return the placeholder to indicate failure.
+        return RawScreenData("<hierarchy/>", 0, 0, screenWidth, screenHeight)
     }
-
 
     /**
      * Asynchronously captures a screenshot from an AccessibilityService in a safe and reliable way.

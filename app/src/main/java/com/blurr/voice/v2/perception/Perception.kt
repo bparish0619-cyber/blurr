@@ -1,6 +1,7 @@
 package com.blurr.voice.v2.perception
 
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresApi
 import com.blurr.voice.RawScreenData
 import com.blurr.voice.api.Eyes
@@ -46,7 +47,7 @@ class Perception(
         val activityName = currentActivity.await()
 
         // Parse the XML from the raw data
-
+        Log.d("ScreenAnal", rawData.xml)
         val parseResult = semanticParser.toHierarchicalString(rawData.xml, previousState, rawData.screenWidth, rawData.screenHeight)
         var uiRepresentation = parseResult.first
         val elementMap = parseResult.second

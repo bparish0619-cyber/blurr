@@ -293,6 +293,7 @@ class ConversationalAgentService : Service() {
     private fun processUserInput(userInput: String) {
         serviceScope.launch {
             removeClarificationQuestions()
+            updateSystemPromptWithAgentStatus()
 
             conversationHistory = addResponse("user", userInput, conversationHistory)
 
@@ -307,6 +308,11 @@ class ConversationalAgentService : Service() {
 
                 when (decision.type) {
                     "Task" -> {
+                        if (AgentService.isRunning) {
+                            val busyMessage = "I'm already working on '${AgentService.currentTask}'. Please let me finish that first, or you can ask me to stop it."
+                            speakAndThenListen(busyMessage)
+                            return@launch
+                        }
                         Log.d("ConvAgent", "Model identified a task. Checking for clarification...")
                         // --- NEW: Check if the task instruction needs clarification ---
                         removeClarificationQuestions()
@@ -373,6 +379,15 @@ class ConversationalAgentService : Service() {
                             conversationHistory = addResponse("model", upgradeMessage, conversationHistory)
 //                            gracefulShutdown(upgradeMessage)
                             speakAndThenListen(upgradeMessage)
+                        }
+                    }
+                    "KillTask" -> {
+                        Log.d("ConvAgent", "Model requested to kill the running agent service.")
+                        if (AgentService.isRunning) {
+                            AgentService.stop(applicationContext)
+                            gracefulShutdown(decision.reply)
+                        } else {
+                            speakAndThenListen("There was no automation running, but I can help with something else.")
                         }
                     }
                     else -> { // Default to "Reply"
@@ -456,6 +471,8 @@ class ConversationalAgentService : Service() {
             You are a helpful voice assistant called Panda that can either have a conversation or ask executor to execute tasks on the user's phone.
             The executor can speak, listen, see screen, tap screen, and basically use the phone as normal human would
 
+            {agent_status_context}
+
             Some Guideline:
             1. If the user ask you to summarize the screen, just send the task to the executor to summarize the screen getting straight to the point. No questions.
             2. If the user ask you to do something creative, you do this task and be the most creative person in the world.
@@ -469,9 +486,10 @@ class ConversationalAgentService : Service() {
             Analyze the user's request and respond in the following format:
 
             ### Type ###
-            Either "Task" or "Reply".
+            Either "Task", "Reply", or "KillTask".
             - Use "Task" if the user is asking you to DO something on the device (e.g., "open settings", "send a text to Mom", "post a tweet").
             - Use "Reply" for conversational questions (e.g., "what's the weather?", "tell me a joke", "how are you?").
+            - Use "KillTask" ONLY if an automation task is running and the user wants to stop it.
 
             ### Reply ###
             The conversational text to speak to the user.
@@ -481,13 +499,36 @@ class ConversationalAgentService : Service() {
 
             ### Instruction ###
             - If Type is "Task", provide the precise, literal instruction for the task agent here. This should be a complete command.
-            - If Type is "Reply", this field should be empty.
+            - If Type is "Reply" or "KillTask", this field should be empty.
 
             ### Should End ###
             "Continue" or "Finished". Use "Finished" only when the conversation is naturally over.
         """.trimIndent()
 
         conversationHistory = addResponse("user", systemPrompt, emptyList())
+    }
+
+    private fun updateSystemPromptWithAgentStatus() {
+        val currentPromptText = conversationHistory.firstOrNull()?.second
+            ?.filterIsInstance<TextPart>()?.firstOrNull()?.text ?: return
+
+        val agentStatusContext = if (AgentService.isRunning) {
+            """
+            IMPORTANT CONTEXT: An automation task is currently running in the background.
+            Task Description: "${AgentService.currentTask}".
+            If the user asks to stop, cancel, or kill this task, you MUST use the "KillTask" type.
+            """.trimIndent()
+        } else {
+            "CONTEXT: No automation task is currently running."
+        }
+
+        val updatedPromptText = currentPromptText.replace("{agent_status_context}", agentStatusContext)
+
+        // Replace the first system message with the updated prompt
+        conversationHistory = conversationHistory.toMutableList().apply {
+            set(0, "user" to listOf(TextPart(updatedPromptText)))
+        }
+        Log.d("ConvAgent", "System prompt updated with agent status: ${AgentService.isRunning}")
     }
 
     /**
