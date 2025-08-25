@@ -61,6 +61,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tasksRemainingTextView: TextView
     private lateinit var freemiumManager: FreemiumManager
     private lateinit var wakeWordHelpLink: TextView
+    private lateinit var increaseLimitsLink: TextView
+
 
     companion object {
         const val ACTION_WAKE_WORD_FAILED = "com.blurr.voice.WAKE_WORD_FAILED"
@@ -111,6 +113,7 @@ class MainActivity : AppCompatActivity() {
 
         val userIdManager = UserIdManager(applicationContext)
         userId = userIdManager.getOrCreateUserId()
+        increaseLimitsLink = findViewById(R.id.increase_limits_link) // ADDED
 
         permissionManager = PermissionManager(this)
         permissionManager.initializePermissionLauncher()
@@ -192,7 +195,9 @@ class MainActivity : AppCompatActivity() {
         managePermissionsButton.setOnClickListener {
             startActivity(Intent(this, PermissionsActivity::class.java))
         }
-
+        increaseLimitsLink.setOnClickListener {
+            requestLimitIncrease()
+        }
         findViewById<TextView>(R.id.github_link_textview).setOnClickListener {
             val url = "https://github.com/Ayush0Chaudhary/blurr"
             val intent = Intent(Intent.ACTION_VIEW, url.toUri())
@@ -208,7 +213,31 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
     }
+    private fun requestLimitIncrease() {
+        val userEmail = auth.currentUser?.email
+        if (userEmail.isNullOrEmpty()) {
+            Toast.makeText(this, "Could not get your email. Please try again.", Toast.LENGTH_SHORT).show()
+            return
+        }
 
+        val recipient = "ayush0000ayush@gmail.com"
+        val subject = "Please increase limits"
+        val body = "Hello,\n\nPlease increase the task limits for my account: $userEmail\n\nThank you."
+
+        val intent = Intent(Intent.ACTION_SENDTO).apply {
+            data = Uri.parse("mailto:") // Only email apps should handle this
+            putExtra(Intent.EXTRA_EMAIL, arrayOf(recipient))
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, body)
+        }
+
+        // Verify that the intent will resolve to an activity
+        if (intent.resolveActivity(packageManager) != null) {
+            startActivity(intent)
+        } else {
+            Toast.makeText(this, "No email application found.", Toast.LENGTH_SHORT).show()
+        }
+    }
     private fun setupGradientText() {
         val karanTextView = findViewById<TextView>(R.id.karan_textview_gradient)
         karanTextView.measure(0, 0)
@@ -278,19 +307,29 @@ class MainActivity : AppCompatActivity() {
 
         alertDialog.show()
     }
-
     private fun updateTaskCounter() {
         lifecycleScope.launch {
             val tasksLeft = freemiumManager.getTasksRemaining()
             if (tasksLeft != null && tasksLeft >= 0) {
                 tasksRemainingTextView.text = "You have $tasksLeft free tasks remaining."
                 tasksRemainingTextView.visibility = View.VISIBLE
+
+                // ADDED: Logic to show/hide the increase limits link
+                // Show the link if the user has 5 or fewer tasks left.
+                if (tasksLeft <= 10) {
+                    increaseLimitsLink.visibility = View.VISIBLE
+                } else {
+                    increaseLimitsLink.visibility = View.GONE
+                }
+
             } else {
-                // Hide the text view if there's an error or count is invalid
+                // Hide both text views if there's an error or count is invalid
                 tasksRemainingTextView.visibility = View.GONE
+                increaseLimitsLink.visibility = View.GONE // ADDED
             }
         }
     }
+
     @SuppressLint("SetTextI18n")
     private fun updateUI() {
         val allPermissionsGranted = permissionManager.areAllPermissionsGranted()
