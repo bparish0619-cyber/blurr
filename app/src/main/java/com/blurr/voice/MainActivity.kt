@@ -2,7 +2,10 @@ package com.blurr.voice
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -18,8 +21,10 @@ import android.view.View
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.VideoView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -30,6 +35,7 @@ import com.blurr.voice.utilities.FreemiumManager
 import com.blurr.voice.utilities.PermissionManager
 import com.blurr.voice.utilities.UserIdManager
 import com.blurr.voice.utilities.UserProfileManager
+import com.blurr.voice.utilities.VideoAssetManager
 import com.blurr.voice.utilities.WakeWordManager
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -37,6 +43,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 import kotlinx.coroutines.launch
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
@@ -51,7 +58,21 @@ class MainActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
     private lateinit var tasksRemainingTextView: TextView
     private lateinit var freemiumManager: FreemiumManager
+    private lateinit var wakeWordHelpLink: TextView
 
+    companion object {
+        const val ACTION_WAKE_WORD_FAILED = "com.blurr.voice.WAKE_WORD_FAILED"
+    }
+    private val wakeWordFailureReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == ACTION_WAKE_WORD_FAILED) {
+                Log.d("MainActivity", "Received wake word failure broadcast.")
+                // The service stops itself, but we should refresh the UI state
+                updateUI()
+                showWakeWordFailureDialog()
+            }
+        }
+    }
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
@@ -97,6 +118,8 @@ class MainActivity : AppCompatActivity() {
 
         tvPermissionStatus = findViewById(R.id.tv_permission_status)
         settingsButton = findViewById(R.id.settingsButton)
+        wakeWordHelpLink = findViewById(R.id.wakeWordHelpLink)
+
         wakeWordButton = findViewById(R.id.wakeWordButton)
         tasksRemainingTextView = findViewById(R.id.tasks_remaining_textview)
         freemiumManager = FreemiumManager()
@@ -109,6 +132,11 @@ class MainActivity : AppCompatActivity() {
         setupClickListeners()
         setupSettingsButton()
         setupGradientText()
+        lifecycleScope.launch {
+            val videoUrl = "https://storage.googleapis.com/blurr-app-assets/wake_word_demo.mp4"
+            VideoAssetManager.getVideoFile(this@MainActivity, videoUrl)
+        }
+
     }
     override fun onStart() {
         super.onStart()
@@ -168,6 +196,9 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(Intent.ACTION_VIEW, url.toUri())
             startActivity(intent)
         }
+        wakeWordHelpLink.setOnClickListener {
+            showWakeWordFailureDialog()
+        }
     }
 
     private fun setupSettingsButton() {
@@ -187,12 +218,65 @@ class MainActivity : AppCompatActivity() {
         karanTextView.paint.shader = textShader
     }
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onResume() {
         super.onResume()
         updateTaskCounter()
 
         updateUI()
+        val filter = IntentFilter(ACTION_WAKE_WORD_FAILED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(wakeWordFailureReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(wakeWordFailureReceiver, filter)
+        }
     }
+    override fun onPause() {
+        super.onPause()
+        // Unregister the BroadcastReceiver to avoid leaks
+        unregisterReceiver(wakeWordFailureReceiver)
+    }
+
+
+    private fun showWakeWordFailureDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_wake_word_failure, null)
+        val videoView = dialogView.findViewById<VideoView>(R.id.video_demo)
+        // You may need to add an ID to the CardView in your XML to hide it
+        val videoContainer = dialogView.findViewById<View>(R.id.video_container_card)
+
+        val builder = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setPositiveButton("Okay") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .setCancelable(false)
+
+        val alertDialog = builder.create()
+
+        // Use a coroutine to get the file, as it might trigger a download
+        lifecycleScope.launch {
+            val videoUrl = "https://storage.googleapis.com/YOUR_BUCKET_NAME/wake_up_demo.mp4"
+            val videoFile: File? = VideoAssetManager.getVideoFile(this@MainActivity, videoUrl)
+
+            if (videoFile != null && videoFile.exists()) {
+                videoContainer.visibility = View.VISIBLE
+                videoView.setVideoURI(Uri.fromFile(videoFile))
+                videoView.setOnPreparedListener { mp ->
+                    mp.isLooping = true
+                }
+                alertDialog.setOnShowListener {
+                    videoView.start()
+                }
+            } else {
+                // If file doesn't exist (e.g., download failed), hide the video player
+                Log.e("MainActivity", "Video file not found, hiding video container.")
+                videoContainer.visibility = View.GONE
+            }
+        }
+
+        alertDialog.show()
+    }
+
     private fun updateTaskCounter() {
         lifecycleScope.launch {
             val tasksLeft = freemiumManager.getTasksRemaining()

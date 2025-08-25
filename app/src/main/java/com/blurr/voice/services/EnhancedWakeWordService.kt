@@ -29,6 +29,7 @@ class EnhancedWakeWordService : Service() {
     companion object {
         const val CHANNEL_ID = "EnhancedWakeWordServiceChannel"
         var isRunning = false
+        const val ACTION_WAKE_WORD_FAILED = "com.blurr.voice.WAKE_WORD_FAILED"
         const val EXTRA_USE_PORCUPINE = "use_porcupine"
     }
 
@@ -85,13 +86,9 @@ class EnhancedWakeWordService : Service() {
         val onApiFailure: () -> Unit = {
             Log.d("EnhancedWakeWordService", "Porcupine API failed, starting floating button service")
             // Start the floating button service when API fails
-            try {
-                val floatingButtonIntent = Intent(this, FloatingPandaButtonService::class.java)
-                startService(floatingButtonIntent)
-                Log.d("EnhancedWakeWordService", "Floating Panda Button Service started due to API failure")
-            } catch (e: Exception) {
-                Log.e("EnhancedWakeWordService", "Error starting floating button service", e)
-            }
+            val intent = Intent(ACTION_WAKE_WORD_FAILED)
+            sendBroadcast(intent)
+            stopSelf()
         }
 
         try {
