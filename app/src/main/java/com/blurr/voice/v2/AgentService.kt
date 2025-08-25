@@ -52,17 +52,52 @@ class AgentService : Service() {
     private lateinit var llmApi: GeminiApi
     private lateinit var actionExecutor: ActionExecutor
 
+//    companion object {
+//        private const val NOTIFICATION_CHANNEL_ID = "AgentServiceChannel"
+//        private const val NOTIFICATION_ID = 1
+//        private const val EXTRA_TASK = "com.blurr.voice.v2.EXTRA_TASK"
+//
+//        /**
+//         * A helper function to easily start the service from anywhere in the app (e.g., an Activity or ViewModel).
+//         *
+//         * @param context The application context.
+//         * @param task The user's high-level task for the agent to perform.
+//         */
+//        fun start(context: Context, task: String) {
+//            Log.d("AgentService", "Starting service with task: $task")
+//            val intent = Intent(context, AgentService::class.java).apply {
+//                putExtra(EXTRA_TASK, task)
+//            }
+//            context.startService(intent)
+//        }
+//    }
+//
+//
     companion object {
         private const val NOTIFICATION_CHANNEL_ID = "AgentServiceChannel"
         private const val NOTIFICATION_ID = 1
         private const val EXTRA_TASK = "com.blurr.voice.v2.EXTRA_TASK"
+        private const val ACTION_STOP_SERVICE = "com.blurr.voice.v2.ACTION_STOP_SERVICE"
+
+        @Volatile
+        var isRunning: Boolean = false
+            private set // Allow external read, but only internal write
+
+        @Volatile
+        var currentTask: String? = null
+            private set // Allow external read, but only internal write
 
         /**
-         * A helper function to easily start the service from anywhere in the app (e.g., an Activity or ViewModel).
-         *
-         * @param context The application context.
-         * @param task The user's high-level task for the agent to perform.
+         * A public method to request the service to stop from outside.
          */
+        fun stop(context: Context) {
+            Log.d("AgentService", "External stop request received.")
+            val intent = Intent(context, AgentService::class.java).apply {
+                action = ACTION_STOP_SERVICE
+            }
+            context.startService(intent)
+        }
+
         fun start(context: Context, task: String) {
             Log.d("AgentService", "Starting service with task: $task")
             val intent = Intent(context, AgentService::class.java).apply {
@@ -71,7 +106,6 @@ class AgentService : Service() {
             context.startService(intent)
         }
     }
-
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate() {
         super.onCreate()
@@ -111,7 +145,11 @@ class AgentService : Service() {
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand: Service has been started.")
-
+        if (intent?.action == ACTION_STOP_SERVICE) {
+            Log.i(TAG, "Received stop action. Stopping service.")
+            stopSelf()
+            return START_NOT_STICKY
+        }
         // Extract the task from the intent
         val task = intent?.getStringExtra(EXTRA_TASK)
         if (task.isNullOrBlank()) {
@@ -119,6 +157,9 @@ class AgentService : Service() {
             stopSelf()
             return START_NOT_STICKY // Don't restart the service
         }
+        isRunning = true
+        currentTask = task
+
 
         // Start the service in the foreground.
         val notification = createNotification("Agent is running task: $task")
@@ -146,6 +187,10 @@ class AgentService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "onDestroy: Service is being destroyed.")
+        // RESET STATUS
+        isRunning = false
+        currentTask = null
+
         // Cancel the coroutine scope to clean up the agent's running job and prevent leaks.
         serviceScope.cancel()
         visualFeedbackManager.hideTtsWave()

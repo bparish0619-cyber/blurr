@@ -168,7 +168,9 @@ class GeminiApi(
                 message.parts.forEach { part ->
                     if (part is TextPart) {
                         text(part.text)
-                        Log.d("GEMINIAPITEMP_INPUT", part.text)
+                        if(!part.text.startsWith("You are a tool-using AI agent designed")) {
+                            Log.d("GEMINIAPITEMP_INPUT", part.text)
+                        }
                     }
                     // Handle other part types like images here if needed in the future.
                 }

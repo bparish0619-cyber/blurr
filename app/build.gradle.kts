@@ -8,6 +8,7 @@ plugins {
     id("com.google.gms.google-services")
     alias(libs.plugins.ksp)
     id("org.jetbrains.kotlin.plugin.serialization") version "2.2.10"
+    id("com.google.firebase.crashlytics")
 
 }
 
@@ -35,6 +36,9 @@ android {
 
     buildTypes {
         release {
+            firebaseCrashlytics {
+                nativeSymbolUploadEnabled = true
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -155,5 +159,7 @@ dependencies {
     implementation(libs.play.services.auth)
 
     implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-crashlytics-ndk")
     implementation(libs.firebase.firestore)
+
 }

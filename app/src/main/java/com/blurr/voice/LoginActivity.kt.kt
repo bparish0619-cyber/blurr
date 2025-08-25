@@ -118,6 +118,8 @@ class LoginActivity : AppCompatActivity() {
         firebaseAuth.signInWithCredential(credential)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
+                    val isNewUser = task.result?.additionalUserInfo?.isNewUser ?: false
+
                     Log.d("LoginActivity", "signInWithCredential:success")
                     // 1. Get the successfully signed-in user
                     val user = firebaseAuth.currentUser
@@ -137,9 +139,13 @@ class LoginActivity : AppCompatActivity() {
                         Log.w("LoginActivity", "User name or email was null, profile not saved.")
                     }
                     lifecycleScope.launch {
-                        val freemiumManager = FreemiumManager()
-                        freemiumManager.provisionUserIfNeeded()
-
+                        if (isNewUser) {
+                            Log.d("LoginActivity", "New user detected. Provisioning freemium account.")
+                            val freemiumManager = FreemiumManager()
+                            freemiumManager.provisionUserIfNeeded()
+                        } else {
+                            Log.d("LoginActivity", "Returning user detected. Skipping provisioning.")
+                        }
                         // Proceed to the next activity only after provisioning is attempted
                         Toast.makeText(this@LoginActivity, "Welcome, ${user?.displayName}", Toast.LENGTH_SHORT).show()
                         startActivity(Intent(this@LoginActivity, MainActivity::class.java))
