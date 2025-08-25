@@ -6,6 +6,7 @@ import android.animation.ValueAnimator
 import android.content.ComponentName
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Point
@@ -322,6 +323,63 @@ class ScreenInteractionService : AccessibilityService() {
         }
         return "Interactable Screen Elements:\n" + elementStrings.joinToString("\n")
     }
+    /**
+     * Shows a thin, white border around the entire screen for 300ms.
+     * This serves as a non-intrusive visual feedback mechanism.
+     */
+    private fun showScreenFlash() {
+        // All UI operations must be on the main thread
+        val mainHandler = Handler(Looper.getMainLooper())
+        mainHandler.post {
+            // Although AccessibilityServices can often draw overlays without this,
+            // it's good practice to check, especially for broader compatibility.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                Log.w("InteractionService", "Cannot show screen flash: 'Draw over other apps' permission not granted.")
+                return@post
+            }
+
+            // 1. Create the View that will be our border
+            val borderView = View(this)
+
+            // 2. Create a drawable for the border (transparent inside, white stroke)
+            val borderDrawable = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(Color.TRANSPARENT) // The middle of the shape is transparent
+                // Set the stroke (the border). 8px is a good thickness.
+                setStroke(8, Color.WHITE)
+            }
+            borderView.background = borderDrawable
+
+            // 3. Define the layout parameters for the overlay
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT, // Full width
+                WindowManager.LayoutParams.MATCH_PARENT, // Full height
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, // Draw on top of everything
+                // These flags make the view non-interactive (can't be touched or focused)
+                // and allow it to draw over the status bar.
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT // Required for transparency
+            )
+
+            try {
+                // 4. Add the view to the window manager
+                windowManager?.addView(borderView, params)
+
+                // 5. Schedule the removal of the view after 300ms
+                mainHandler.postDelayed({
+                    // Ensure the view is still attached to the window before removing
+                    if (borderView.isAttachedToWindow) {
+                        windowManager?.removeView(borderView)
+                    }
+                }, 500L) // The flash duration
+
+            } catch (e: Exception) {
+                Log.e("InteractionService", "Failed to add screen flash view", e)
+            }
+        }
+    }
 
     suspend fun dumpWindowHierarchy(pureXML: Boolean = false): String {
         return withContext(Dispatchers.Default) {
@@ -370,16 +428,11 @@ class ScreenInteractionService : AccessibilityService() {
                     drawDebugBoundingBoxes(simplifiedElements)
                 }
 
-                // Inform user with a bottom toast (no screenshots taken)
                 try {
-                    Handler(Looper.getMainLooper()).post {
-                        android.widget.Toast.makeText(
-                            this@ScreenInteractionService,
-                            "We just read your screen structure (no screenshots) of single frame so we can automate your task.",
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                } catch (_: Exception) { }
+                    showScreenFlash()
+                } catch (e: Exception) {
+                    Log.e("InteractionService", "Failed to trigger screen flash", e)
+                }
 
                 if (pureXML) {
                     return@withContext rawXml
