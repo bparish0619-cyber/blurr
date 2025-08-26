@@ -103,7 +103,7 @@ class MainActivity : AppCompatActivity() {
         if (currentUser == null || !profileManager.isProfileComplete()) {
             startActivity(Intent(this, LoginActivity::class.java))
             finish() // Destroy MainActivity
-            return   // Stop executing any more code in this method
+            return  // Stop executing any more code in this method
         }
 
 
@@ -151,17 +151,17 @@ class MainActivity : AppCompatActivity() {
             finish()
         }
     }
-//    private fun signOut() {
-//        auth.signOut()
-//        // Optional: Also sign out from the Google account on the device
-//        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
-//        val googleSignInClient = GoogleSignIn.getClient(this, gso)
-//        googleSignInClient.signOut().addOnCompleteListener {
-//            // After signing out, redirect to LoginActivity
-//            startActivity(Intent(this, LoginActivity::class.java))
-//            finish()
-//        }
-//    }
+    //  private fun signOut() {
+//      auth.signOut()
+//      // Optional: Also sign out from the Google account on the device
+//      val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+//      val googleSignInClient = GoogleSignIn.getClient(this, gso)
+//      googleSignInClient.signOut().addOnCompleteListener {
+//          // After signing out, redirect to LoginActivity
+//          startActivity(Intent(this, LoginActivity::class.java))
+//          finish()
+//      }
+//  }
     private fun handleIntent(intent: Intent?) {
         if (intent?.action == "com.blurr.voice.WAKE_UP_PANDA") {
             Log.d("MainActivity", "Wake up Panda shortcut activated!")
@@ -332,12 +332,12 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetTextI18n")
     private fun updateUI() {
-        val allPermissionsGranted = permissionManager.areAllPermissionsGranted()
-        if (allPermissionsGranted) {
+        val missingPermissions = permissionManager.getMissingPermissions()
+        if (missingPermissions.isEmpty()) {
             tvPermissionStatus.text = "All required permissions are granted."
             tvPermissionStatus.setTextColor(Color.parseColor("#4CAF50")) // Green
         } else {
-            tvPermissionStatus.text = "Some permissions are missing. Tap below to manage."
+            tvPermissionStatus.text = "Missing permissions: ${missingPermissions.joinToString(", ")}"
             tvPermissionStatus.setTextColor(Color.parseColor("#F44336")) // Red
         }
         wakeWordManager.updateButtonState(wakeWordButton)

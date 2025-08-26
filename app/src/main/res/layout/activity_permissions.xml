@@ -203,7 +203,7 @@
                     android:layout_height="24dp"
                     android:layout_centerVertical="true"
                     android:layout_marginEnd="12dp"
-                    android:src="@drawable/ic_accessibility"
+                    android:src="@drawable/ic_overlay"
                     app:tint="@color/white"
                     tools:ignore="ContentDescription" />
 

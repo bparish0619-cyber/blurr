@@ -24,6 +24,7 @@ class PermissionsActivity : AppCompatActivity() {
     private lateinit var accessibilityStatus: TextView
     private lateinit var microphoneStatus: TextView
     private lateinit var overlayStatus: TextView
+    private lateinit var appListStatus: TextView
 
     // NEW: Add Button variables
     private lateinit var grantAccessibilityButton: Button
@@ -49,6 +50,7 @@ class PermissionsActivity : AppCompatActivity() {
         accessibilityStatus = findViewById(R.id.accessibilityStatus)
         microphoneStatus = findViewById(R.id.microphoneStatus)
         overlayStatus = findViewById(R.id.overlayStatus)
+        appListStatus = findViewById(R.id.appListStatus)
 
         // NEW: Find all Grant Buttons
         grantAccessibilityButton = findViewById(R.id.grantAccessibilityButton)
@@ -151,6 +153,17 @@ class PermissionsActivity : AppCompatActivity() {
             overlayStatus.setBackgroundResource(R.drawable.status_background_denied)
             grantOverlayButton.visibility = View.VISIBLE
         }
+
+        // 4. App List Permission Check
+        if (isAppListPermissionGranted()) {
+            appListStatus.text = "Granted"
+            appListStatus.setTextColor(Color.parseColor("#4CAF50"))
+            appListStatus.setBackgroundResource(R.drawable.status_background_granted)
+        } else {
+            appListStatus.text = "Not Granted"
+            appListStatus.setTextColor(Color.parseColor("#F44336"))
+            appListStatus.setBackgroundResource(R.drawable.status_background_denied)
+        }
     }
 
     // --- Helper functions to check each permission (no changes here) ---
@@ -193,5 +206,12 @@ class PermissionsActivity : AppCompatActivity() {
         } else {
             true // Granted at install time on older versions
         }
+    }
+
+    private fun isAppListPermissionGranted(): Boolean {
+        // For a non-Play Store app that declares QUERY_ALL_PACKAGES, this permission is granted on installation on API 30+.
+        // Before API 30, the permission wasn't needed for this app's functionality.
+        // For the purpose of this status UI, we can consider it granted.
+        return true
     }
 }
