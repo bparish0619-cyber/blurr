@@ -303,7 +303,7 @@ class ConversationalAgentService : Service() {
                     return@launch
                 }
 
-                val rawModelResponse = getReasoningModelApiResponse(conversationHistory, "") ?: "### Type ###\nReply\n### Reply ###\nI'm sorry, I had an issue.\n### Instruction ###\n\n### Should End ###\nContinue"
+                val rawModelResponse = getReasoningModelApiResponse(conversationHistory) ?: "### Type ###\nReply\n### Reply ###\nI'm sorry, I had an issue.\n### Instruction ###\n\n### Should End ###\nContinue"
                 val decision = parseModelResponse(rawModelResponse)
 
                 when (decision.type) {
@@ -442,7 +442,7 @@ class ConversationalAgentService : Service() {
             val chat = clarificationAgent.initChat()
             val combined = VisionHelper.createChatResponse("user", prompt, chat, config)
             val response = withContext(Dispatchers.IO) {
-                getReasoningModelApiResponse(combined, apiKey = config.apiKey)
+                getReasoningModelApiResponse(combined)
             }
 
             val parsedResult = clarificationAgent.parseResponse(response.toString())

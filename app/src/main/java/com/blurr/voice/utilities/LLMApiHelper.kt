@@ -72,7 +72,7 @@ fun addResponsePrePost(
 
 suspend fun getReasoningModelApiResponse(
     chat: List<Pair<String, List<Any>>>,
-    apiKey: String,
+    
     agentState: InfoPool? = null // NEW: Optional agent state parameter
 ): String? { // Return nullable String
     // Network check to avoid unnecessary API calls
