@@ -136,7 +136,7 @@ class ContentModerationService : Service() {
         }
         try {
             var screenshotBitmap = eyes.openEyes()
-            val API_KEY = "AIzaSyBlepfkVTJAS6oVquyYlctE299v8PIFbQg"
+
 
             // 3. Prepare AI Prompt
             val judge = Judge()
@@ -167,7 +167,7 @@ class ContentModerationService : Service() {
 
                 // 4. Call the AI with the in-memory bitmap
                 val combined = addResponse("user", pro, init,screenshotBitmap)
-                val output = getReasoningModelApiResponse(combined, apiKey = API_KEY)
+                val output = getReasoningModelApiResponse(combined)
                 val parsed = judge.parseResponse(output.toString())
 
                 Log.d("ModerationService", "JUDGEMENT: ${parsed["judgement"]}")

@@ -334,7 +334,7 @@ class AgentTaskService : Service() {
             val combinedChatPlan = VisionHelper.createChatResponse(
                 "user", promptPlan, chatPlan, config, screenshotFile
             )
-            val outputPlan = getReasoningModelApiResponse(combinedChatPlan, apiKey = config.apiKey, agentState = infoPool)
+            val outputPlan = getReasoningModelApiResponse(combinedChatPlan)
             val parsedManagerResponse = manager.parseResponse(outputPlan.toString())
             val managerThinkingEnd = System.currentTimeMillis()
 
@@ -405,7 +405,7 @@ class AgentTaskService : Service() {
             val actionCombinedChat = VisionHelper.createChatResponse(
                 "user", actionPrompt, actionChat, config, screenshotFile
             )
-            val actionOutput = getReasoningModelApiResponse(actionCombinedChat, apiKey = config.apiKey, agentState = infoPool)
+            val actionOutput = getReasoningModelApiResponse(actionCombinedChat)
             val parsedAction = operator.parseResponse(actionOutput.toString())
             val actionThought = parsedAction["thought"]
             val actionObjStr = parsedAction["action"]
