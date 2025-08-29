@@ -2,6 +2,7 @@ package com.blurr.voice
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.role.RoleManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -24,6 +25,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.VideoView
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
@@ -34,6 +36,7 @@ import androidx.core.graphics.toColorInt
 import androidx.lifecycle.lifecycleScope
 import com.blurr.voice.services.EnhancedWakeWordService
 import com.blurr.voice.utilities.FreemiumManager
+import com.blurr.voice.utilities.OnboardingManager
 import com.blurr.voice.utilities.PermissionManager
 import com.blurr.voice.utilities.UserIdManager
 import com.blurr.voice.utilities.UserProfileManager
@@ -62,8 +65,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var freemiumManager: FreemiumManager
     private lateinit var wakeWordHelpLink: TextView
     private lateinit var increaseLimitsLink: TextView
-
-
+    private lateinit var onboardingManager: OnboardingManager
+    private lateinit var requestRoleLauncher: ActivityResultLauncher<Intent>
     companion object {
         const val ACTION_WAKE_WORD_FAILED = "com.blurr.voice.WAKE_WORD_FAILED"
     }
@@ -105,9 +108,52 @@ class MainActivity : AppCompatActivity() {
             finish() // Destroy MainActivity
             return   // Stop executing any more code in this method
         }
+        onboardingManager = OnboardingManager(this)
+        if (!onboardingManager.isOnboardingCompleted()) {
+            Log.d("MainActivity", "User is logged in but onboarding not completed. Relaunching permissions stepper.")
+            startActivity(Intent(this, OnboardingPermissionsActivity::class.java))
+            finish()
+            return
+        }
+
+//        val roleManager = getSystemService(RoleManager::class.java)
+//        if (roleManager?.isRoleAvailable(RoleManager.ROLE_ASSISTANT) == true &&
+//            !roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)) {
+//            val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT)
+//            startActivityForResult(intent, 1001)
+//        } else {
+//            // Fallbacks if the role UI isn’t available
+//            val intents = listOf(
+//                Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+//                Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
+//            )
+//            for (i in intents) if (i.resolveActivity(packageManager) != null) {
+//                startActivity(i); break
+//            }
+//        }
+
+        requestRoleLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                Toast.makeText(this, "Set as default assistant successfully!", Toast.LENGTH_SHORT).show()
+            } else {
+                // Explain and offer Settings
+                Toast.makeText(this, "Couldn’t become default assistant. Opening settings…", Toast.LENGTH_SHORT).show()
+                Log.w("MainActivity", "Role request canceled or app not eligible.\n${explainAssistantEligibility()}")
+                openAssistantPickerSettings()
+            }
+            showAssistantStatus(true)
+        }
 
 
         setContentView(R.layout.activity_main)
+        // existing click listener
+        findViewById<TextView>(R.id.btn_set_default_assistant).setOnClickListener {
+            startActivity(Intent(this, RoleRequestActivity::class.java))
+        }
+
+        // show/hide based on current status
+        updateDefaultAssistantButtonVisibility()
+
         handleIntent(intent)
         managePermissionsButton = findViewById(R.id.btn_manage_permissions) // ADDED
 
@@ -117,7 +163,7 @@ class MainActivity : AppCompatActivity() {
 
         permissionManager = PermissionManager(this)
         permissionManager.initializePermissionLauncher()
-        permissionManager.requestAllPermissions()
+
         // Initialize UI components
         managePermissionsButton = findViewById(R.id.btn_manage_permissions)
 
@@ -143,6 +189,51 @@ class MainActivity : AppCompatActivity() {
         }
 
     }
+
+    private fun openAssistantPickerSettings() {
+        // Try the dedicated assistant settings screen first
+        val specifics = listOf(
+            Intent("android.settings.VOICE_INPUT_SETTINGS"),
+            Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
+            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+        )
+        for (i in specifics) {
+            if (i.resolveActivity(packageManager) != null) {
+                startActivity(i); return
+            }
+        }
+        Toast.makeText(this, "Assistant settings not available on this device.", Toast.LENGTH_SHORT).show()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    fun showAssistantStatus(toast: Boolean = false) {
+        val rm = getSystemService(RoleManager::class.java)
+        val held = rm?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
+        val msg = if (held) "This app is the default assistant." else "This app is NOT the default assistant."
+        if (toast) Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+        Log.d("MainActivity", msg)
+    }
+
+    private fun explainAssistantEligibility(): String {
+        val pm = packageManager
+        val pkg = packageName
+
+        // Does my app have an activity that handles ACTION_ASSIST?
+        val assistIntent = Intent(Intent.ACTION_ASSIST).setPackage(pkg)
+        val assistActivities = pm.queryIntentActivities(assistIntent, 0)
+
+        // Does my app declare a VoiceInteractionService? (Most third-party apps won't)
+        val visIntent = Intent("android.service.voice.VoiceInteractionService").setPackage(pkg)
+        val visServices = pm.queryIntentServices(visIntent, 0)
+
+        return buildString {
+            append("Assistant eligibility:\n")
+            append("• ACTION_ASSIST activity: ${if (assistActivities.isNotEmpty()) "FOUND" else "NOT FOUND"}\n")
+            append("• VoiceInteractionService: ${if (visServices.isNotEmpty()) "FOUND" else "NOT FOUND"}\n")
+            append("Note: Many OEMs only list apps with a VoiceInteractionService as selectable assistants.\n")
+        }
+    }
+
     override fun onStart() {
         super.onStart()
         // It's good practice to re-check authentication in onStart as well.
@@ -335,12 +426,30 @@ class MainActivity : AppCompatActivity() {
         val allPermissionsGranted = permissionManager.areAllPermissionsGranted()
         if (allPermissionsGranted) {
             tvPermissionStatus.text = "All required permissions are granted."
+            managePermissionsButton.visibility = View.GONE
             tvPermissionStatus.setTextColor(Color.parseColor("#4CAF50")) // Green
         } else {
             tvPermissionStatus.text = "Some permissions are missing. Tap below to manage."
             tvPermissionStatus.setTextColor(Color.parseColor("#F44336")) // Red
         }
         wakeWordManager.updateButtonState(wakeWordButton)
+    }
+
+    private fun isThisAppDefaultAssistant(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val rm = getSystemService(RoleManager::class.java)
+            rm?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
+        } else {
+            // Pre-Q best-effort: check the current VoiceInteractionService owner
+            val flat = Settings.Secure.getString(contentResolver, "voice_interaction_service")
+            val currentPkg = flat?.substringBefore('/')
+            currentPkg == packageName
+        }
+    }
+
+    private fun updateDefaultAssistantButtonVisibility() {
+        val btn = findViewById<TextView>(R.id.btn_set_default_assistant)
+        btn.visibility = if (isThisAppDefaultAssistant()) View.GONE else View.VISIBLE
     }
 
 }

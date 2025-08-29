@@ -13,7 +13,12 @@
     <string name="permission_not_granted">Permission: Not Granted</string>
     <string name="service_status_stopped">Service Status: Stopped</string>
     <string name="wake_word_help_link"><u>Wake word not initializing? Open me!</u></string>
-
+    <string name="notifications_permission_title">Notifications</string>
+    <string name="notifications_permission_desc">Allow Panda to send you notifications for important updates or messages.</string>
+    <string name="default_assistant_role_title">Set as Default Assistant</string>
+    <string name="default_assistant_role_desc">This lets you activate Panda by holding the home button or using a voice command, even when the app is closed.</string>
+    <string name="grant_permission_button">Grant Permission</string>
+    <string name="finish_onboarding_button">Finish Onboarding</string>
     <string name="vision_mode">Vision Mode:</string>
     <string name="xml_mode">XML Mode</string>
     <string name="screenshot_mode">Screenshot Mode</string>

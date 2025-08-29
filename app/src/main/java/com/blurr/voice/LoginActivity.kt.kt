@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.blurr.voice.utilities.FreemiumManager
+import com.blurr.voice.utilities.OnboardingManager
 import com.blurr.voice.utilities.UserProfileManager
 import com.google.android.gms.auth.api.identity.BeginSignInRequest
 import com.google.android.gms.auth.api.identity.Identity
@@ -112,7 +113,6 @@ class LoginActivity : AppCompatActivity() {
             }
     }
 
-    // 5. Update this function to accept the ID Token string directly
     private fun firebaseAuthWithGoogle(idToken: String) {
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         firebaseAuth.signInWithCredential(credential)
@@ -138,24 +138,30 @@ class LoginActivity : AppCompatActivity() {
                         profileManager.saveProfile("Unknown", "unknown")
                         Log.w("LoginActivity", "User name or email was null, profile not saved.")
                     }
+
                     lifecycleScope.launch {
+                        val onboardingManager = OnboardingManager(this@LoginActivity)
+
                         if (isNewUser) {
                             Log.d("LoginActivity", "New user detected. Provisioning freemium account.")
                             val freemiumManager = FreemiumManager()
                             freemiumManager.provisionUserIfNeeded()
-                        } else {
-                            Log.d("LoginActivity", "Returning user detected. Skipping provisioning.")
                         }
-                        // Proceed to the next activity only after provisioning is attempted
-                        Toast.makeText(this@LoginActivity, "Welcome, ${user?.displayName}", Toast.LENGTH_SHORT).show()
-                        startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+
+                        // CHECK THE LOCAL FLAG INSTEAD OF isNewUser
+                        if (onboardingManager.isOnboardingCompleted()) {
+                            Log.d("LoginActivity", "Onboarding already completed on this device. Launching main activity.")
+                            startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                        } else {
+                            Log.d("LoginActivity", "Onboarding not completed. Launching permissions stepper.")
+                            startActivity(Intent(this@LoginActivity, OnboardingPermissionsActivity::class.java))
+                        }
                         finish()
                     }
                 } else {
                     Log.w("LoginActivity", "signInWithCredential:failure", task.exception)
                     Toast.makeText(this, "Authentication Failed.", Toast.LENGTH_SHORT).show()
                 }
-                // The progress bar is already handled by the launcher's result
             }
     }
 }
