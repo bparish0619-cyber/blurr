@@ -1,7 +1,6 @@
 # 🐼 Panda: Your Personal AI Phone Operator  
-
 **You touch grass. I'll touch your glass.**  
-[![Join Discord](https://img.shields.io/badge/Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)]([https://discord.gg/FhyfrZBq](https://discord.gg/b2hxFNXvWk))
+[![Join Discord](https://img.shields.io/badge/Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)]([https://discord.gg/b2hxFNXvWk](https://discord.gg/b2hxFNXvWk))
 [![Apply for Internal Test](https://img.shields.io/badge/Apply%20Now%20For%20Closed%20Testing-34A853?style=for-the-badge&logo=googleforms&logoColor=white)](https://docs.google.com/forms/d/e/1FAIpQLScgviOQ13T8Z5sYD6KOLAPex4H_St0ubWNmuRIsXweFzRVrSw/viewform?usp=dialog)
 
 Apply for the closed test: [google form](https://docs.google.com/forms/d/e/1FAIpQLScgviOQ13T8Z5sYD6KOLAPex4H_St0ubWNmuRIsXweFzRVrSw/viewform?usp=dialog)
