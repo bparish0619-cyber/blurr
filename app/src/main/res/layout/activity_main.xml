@@ -70,7 +70,7 @@
                 android:focusable="true"
                 android:gravity="center"
                 android:padding="12dp"
-                android:text="My Memories"
+                android:text="Panda's Memories"
                 android:textColor="@android:color/white"
                 android:textSize="16sp" />
 
@@ -86,6 +86,20 @@
                 android:text="@string/enable_wake_word"
                 android:textColor="@android:color/white"
                 android:textSize="16sp" />
+            <TextView
+                android:id="@+id/btn_set_default_assistant"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/rounded_button"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:padding="12dp"
+                android:text="Set as Default Assistant"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+
             <TextView
                 android:id="@+id/wakeWordHelpLink"
                 android:layout_width="wrap_content"
