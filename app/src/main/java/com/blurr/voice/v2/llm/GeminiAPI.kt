@@ -168,7 +168,7 @@ class GeminiApi(
                 message.parts.forEach { part ->
                     if (part is TextPart) {
                         text(part.text)
-                        if(!part.text.startsWith("You are a tool-using AI agent designed")) {
+                        if(part.text.startsWith("<agent_history>") || part.text.startsWith("Memory:")) {
                             Log.d("GEMINIAPITEMP_INPUT", part.text)
                         }
                     }

@@ -286,7 +286,7 @@ class SemanticParser {
             return node.children
         }
         // 2. Decide what to do with the current node.
-        return if (node.isSemanticallyImportant() || node.children.isNotEmpty()) {
+        return if (node.isSemanticallyImportant() || node.isInteractive() || node.children.isNotEmpty()) {
             // Keep this node. Its (potentially promoted) children are already attached.
             listOf(node)
         } else {
