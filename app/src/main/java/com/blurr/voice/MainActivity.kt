@@ -297,6 +297,9 @@ class MainActivity : AppCompatActivity() {
         wakeWordHelpLink.setOnClickListener {
             showWakeWordFailureDialog()
         }
+        findViewById<TextView>(R.id.disclaimer_link).setOnClickListener {
+            showDisclaimerDialog()
+        }
     }
 
     private fun setupSettingsButton() {
@@ -358,26 +361,33 @@ class MainActivity : AppCompatActivity() {
         // Unregister the BroadcastReceiver to avoid leaks
         unregisterReceiver(wakeWordFailureReceiver)
     }
+    private fun showDisclaimerDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Disclaimer")
+            .setMessage("Panda is an experimental AI assistant and is still in development. It may not always be accurate or perform as expected. It does small task better. Your understanding is appreciated!")
+            .setPositiveButton("Okay") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
 
 
     private fun showWakeWordFailureDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_wake_word_failure, null)
         val videoView = dialogView.findViewById<VideoView>(R.id.video_demo)
-        // You may need to add an ID to the CardView in your XML to hide it
         val videoContainer = dialogView.findViewById<View>(R.id.video_container_card)
 
         val builder = AlertDialog.Builder(this)
             .setView(dialogView)
-            .setPositiveButton("Okay") { dialog, _ ->
+            .setPositiveButton("Got it") { dialog, _ ->
                 dialog.dismiss()
             }
-            .setCancelable(false)
 
         val alertDialog = builder.create()
 
         // Use a coroutine to get the file, as it might trigger a download
         lifecycleScope.launch {
-            val videoUrl = "https://storage.googleapis.com/YOUR_BUCKET_NAME/wake_up_demo.mp4"
+            val videoUrl = "https://storage.googleapis.com/blurr-app-assets/wake_word_demo.mp4"
             val videoFile: File? = VideoAssetManager.getVideoFile(this@MainActivity, videoUrl)
 
             if (videoFile != null && videoFile.exists()) {
