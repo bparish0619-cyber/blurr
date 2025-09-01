@@ -2,6 +2,7 @@ package com.blurr.voice.v2.llm
 
 import android.util.Log
 import androidx.room.ForeignKey
+import com.blurr.voice.BuildConfig
 import com.blurr.voice.api.ApiKeyManager
 import com.blurr.voice.v2.AgentOutput
 import com.google.ai.client.generativeai.GenerativeModel
@@ -13,12 +14,14 @@ import com.google.ai.client.generativeai.type.Schema
 import com.google.ai.client.generativeai.type.ServerException
 import com.google.ai.client.generativeai.type.content
 import kotlinx.coroutines.delay
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.seconds
 
@@ -44,7 +47,13 @@ class GeminiApi(
 
     companion object {
         private const val TAG = "GeminiV2Api"
+        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
+
+    private val proxyUrl: String = BuildConfig.GCLOUD_PROXY_URL
+    private val proxyKey: String = BuildConfig.GCLOUD_PROXY_URL_KEY
+
+    private val httpClient = OkHttpClient()
 
     private val jsonParser = Json {
         ignoreUnknownKeys = true
@@ -55,35 +64,6 @@ class GeminiApi(
     // Cache for GenerativeModel instances to avoid repeated initializations.
     private val modelCache = ConcurrentHashMap<String, GenerativeModel>()
 
-    /**
-     * KDoc comment to strongly advise developers to keep this schema synchronized
-     * with the AgentOutput data class to prevent runtime errors.
-     *
-     * IMPORTANT: This schema MUST be kept in sync with the [AgentOutput] data class.
-     * Any changes to [AgentOutput] must be reflected here.
-     */
-//    private val agentOutputSchema = Schema.obj(
-//        name = "agentOutput",
-//        description = "The structured output from the agent.",
-//        Schema.str("thinking", "The agent's inner monologue and reasoning."),
-//        Schema.str("evaluationPreviousGoal", "The agent's evaluation of the previous step's outcome."),
-//        Schema.str("memory", "The agent's short-term memory for the next step."),
-//        Schema.str("nextGoal", "The agent's immediate goal for the current step."),
-//        Schema.arr(
-//            name = "action",
-//            description = "A list of actions to be executed.",
-//            items = Schema.obj(
-//                "actionSpec",
-//                "A single action specification.",
-//                Schema.enum("name", "The name of the action to execute.", ForeignKey.Action.entries.map { it.name }),
-//                Schema.obj(
-//                    "parameters", "A map of parameter names to their values for the action."
-//                    // NOTE: We define `parameters` as a generic object. The LLM will populate it.
-//                    // This is more flexible than defining every parameter for every action.
-//                )
-//            )
-//        )
-//    )
 
 
     private val jsonGenerationConfig = GenerationConfig.builder().apply {
@@ -109,7 +89,6 @@ class GeminiApi(
         return try {
             Log.d(TAG, "Parsing guaranteed JSON response. $jsonString")
             Log.d("GEMINIAPITEMP_OUTPUT", jsonString)
-
             jsonParser.decodeFromString<AgentOutput>(jsonString)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse JSON into AgentOutput. Error: ${e.message}", e)
@@ -118,18 +97,56 @@ class GeminiApi(
     }
 
     /**
-     * Performs the actual API call to the Gemini model.
-     *
-     * @param messages The list of [GeminiMessage] objects.
-     * @return The response text from the model as a String.
-     * @throws ServerException for API-level errors (e.g., invalid key, rate limits).
-     * @throws ContentBlockedException if the response was blocked for safety reasons.
-     * @throws Exception for other network or unexpected errors.
+     * AUTOMATIC DISPATCHER: Checks internal config and decides whether to use
+     * the secure proxy or a direct API call.
      */
     private suspend fun performApiCall(messages: List<GeminiMessage>): String {
-        val apiKey = apiKeyManager.getNextKey()
+        return if (!proxyUrl.isNullOrBlank() && !proxyKey.isNullOrBlank()) {
+            Log.i(TAG, "Proxy config found. Using secure Cloud Function.")
+            performProxyApiCall(messages)
+        } else {
+            Log.i(TAG, "Proxy config not found. Using direct Gemini SDK call (Fallback).")
+            performDirectApiCall(messages)
+        }
+    }
 
-        // Use cached model instance or create a new one if it doesn't exist for the given key.
+    /**
+     * PROXY MODE: Performs the API call through the secure Google Cloud Function.
+     */
+    private suspend fun performProxyApiCall(messages: List<GeminiMessage>): String {
+        val proxyMessages = messages.map {
+            ProxyRequestMessage(
+                role = it.role.name.lowercase(),
+                parts = it.parts.filterIsInstance<TextPart>().map { part -> ProxyRequestPart(part.text) }
+            )
+        }
+        val requestPayload = ProxyRequestBody(modelName, proxyMessages)
+        val jsonBody = jsonParser.encodeToString(ProxyRequestBody.serializer(), requestPayload)
+
+        val request = Request.Builder()
+            .url(proxyUrl)
+            .post(jsonBody.toRequestBody(JSON_MEDIA_TYPE))
+            .addHeader("Content-Type", "application/json")
+            .addHeader("X-API-Key", proxyKey)
+            .build()
+
+        httpClient.newCall(request).execute().use { response ->
+            val responseBodyString = response.body?.string()
+            if (!response.isSuccessful || responseBodyString.isNullOrBlank()) {
+                val errorMsg = "Proxy API call failed with code: ${response.code}, body: $responseBodyString"
+                Log.e(TAG, errorMsg)
+                throw IOException(errorMsg)
+            }
+            Log.d(TAG, "Successfully received response from proxy.")
+            return responseBodyString
+        }
+    }
+
+    /**
+     * DIRECT MODE: Performs the API call using the embedded Google AI SDK.
+     */
+    private suspend fun performDirectApiCall(messages: List<GeminiMessage>): String {
+        val apiKey = apiKeyManager.getNextKey()
         val generativeModel = modelCache.getOrPut(apiKey) {
             Log.d(TAG, "Creating new GenerativeModel instance for key ending in ...${apiKey.takeLast(4)}")
             GenerativeModel(
@@ -139,16 +156,12 @@ class GeminiApi(
                 requestOptions = requestOptions
             )
         }
-
         val history = convertToSdkHistory(messages)
         val response = generativeModel.generateContent(*history.toTypedArray())
-
         response.text?.let {
             Log.d(TAG, "Successfully received response from model.")
             return it
         }
-
-        // Handle cases where the response is empty or blocked.
         val reason = response.promptFeedback?.blockReason?.name ?: "UNKNOWN"
         throw ContentBlockedException("Blocked or empty response from API. Reason: $reason")
     }
@@ -168,7 +181,7 @@ class GeminiApi(
                 message.parts.forEach { part ->
                     if (part is TextPart) {
                         text(part.text)
-                        if(!part.text.startsWith("You are a tool-using AI agent designed")) {
+                        if(part.text.startsWith("<agent_history>") || part.text.startsWith("Memory:")) {
                             Log.d("GEMINIAPITEMP_INPUT", part.text)
                         }
                     }
@@ -188,7 +201,7 @@ class GeminiApi(
      */
     suspend fun generateGroundedContent(prompt: String): String? {
         val apiKey = apiKeyManager.getNextKey() // Reuse your existing key manager
-        val client = OkHttpClient()
+
         val mediaType = "application/json; charset=utf-8".toMediaType()
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent"
 
@@ -219,7 +232,7 @@ class GeminiApi(
             .build()
 
         return try {
-            val response = client.newCall(request).execute()
+            val response = httpClient.newCall(request).execute()
             val responseBody = response.body?.string()
 
             if (!response.isSuccessful || responseBody == null) {
@@ -246,6 +259,16 @@ class GeminiApi(
     }
 
 }
+
+@Serializable
+private data class ProxyRequestPart(val text: String)
+
+@Serializable
+private data class ProxyRequestMessage(val role: String, val parts: List<ProxyRequestPart>)
+
+@Serializable
+private data class ProxyRequestBody(val modelName: String, val messages: List<ProxyRequestMessage>)
+
 
 /**
  * Custom exception to indicate that the response content was blocked by the API.

@@ -71,7 +71,6 @@ Examples:
 Note that:
 - Only elements with numeric indexes in [] are interactive
 - (stacked) indentation (with \t (tab)) is important and means that the element is a (XML) child of the element above (with a lower index)
-- Elements with \* are new elements that were added after the previous step.
 - Pure text elements without [] are not interactive.
   </android_state>
 
