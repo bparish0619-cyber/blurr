@@ -2,10 +2,12 @@ package com.blurr.voice
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
@@ -90,13 +92,11 @@ class OnboardingPermissionsActivity : AppCompatActivity() {
         permissionSteps.add(
             PermissionStep(
                 titleRes = R.string.accessibility_permission_title,
-                descRes = R.string.accessibility_permission_desc,
+                descRes = R.string.accessibility_permission_full_desc,
                 iconRes = R.drawable.ic_accessibility,
                 isGranted = { accessibilityServiceChecker.isAccessibilityServiceEnabled() },
-                action = {
-                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                    startActivity(intent)
-                }
+                // The action now shows the consent dialog instead of going directly to settings
+                action = { showAccessibilityConsentDialog() }
             )
         )
 
@@ -167,7 +167,26 @@ class OnboardingPermissionsActivity : AppCompatActivity() {
         val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
         startActivity(intent) // (no launcher)
     }
+    private fun showAccessibilityConsentDialog() {
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.accessibility_consent_title))
+            .setMessage(getString(R.string.accessibility_permission_details))
+            .setPositiveButton(getString(R.string.accept)) { _, _ ->
+                // User clicked Accept, navigate to System Settings
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                startActivity(intent)
+            }
+            .setNegativeButton(getString(R.string.decline)) { dialog, _ ->
+                // User clicked Decline, just dismiss the dialog and do nothing
+                dialog.dismiss()
+            }
+            .create()
 
+        // Now, show the dialog
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.WHITE)
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#F44336"))
+    }
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun setupLaunchers() {
         requestPermissionLauncher =

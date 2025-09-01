@@ -47,10 +47,10 @@
     </string>
     <string name="app_list_permission_title">App Management</string>
     <string name="app_list_permission_desc">Allows Panda to see the apps you have installed. With this, Panda can open applications for you directly and instantly (e.g., "Open YouTube"), instead of relying on slower methods of searching the screen. This makes the process much faster and more reliable.</string>
-    <string name="accessibility_consent_title">Permission Confirmation</string>
-    <string name="accessibility_consent_message">To enable hands-free control, Panda requires Accessibility permission. This allows the app to:\n\n• <b>Read the content on your screen</b> to understand context.\n\n• <b>Perform actions for you</b> like tapping, scrolling, and navigating.\n\nPanda is designed to assist, especially visually impaired users, by enabling full voice control of the device.\n\nDo you want to proceed to Settings to enable this?</string>
-    <string name="accept">Accept</string>
-    <string name="decline">Decline</string>
+<!--    <string name="accessibility_consent_title">Permission Confirmation</string>-->
+<!--    <string name="accessibility_consent_message">To enable hands-free control, Panda requires Accessibility permission. This allows the app to:\n\n• <b>Read the content on your screen</b> to understand context.\n\n• <b>Perform actions for you</b> like tapping, scrolling, and navigating.\n\nPanda is designed to assist, especially visually impaired users, by enabling full voice control of the device.\n\nDo you want to proceed to Settings to enable this?</string>-->
+<!--    <string name="accept">Accept</string>-->
+<!--    <string name="decline">Decline</string>-->
     <string name="cancel">Cancel</string>
     <string name="type_answer_here">Type your answer here…</string>
     <string name="or_use_voice_input">Or use voice input</string>
@@ -90,4 +90,11 @@
     <string name="overlay_permission_desc">This permission is used to show visual feedback, such as the questions that panda have, captions and the voice wave animations, on top of other apps while Panda is working.</string>
     <string name="at_the_end_of_a_conversation_panda_s_ai_powered_by_google_s_gemini_model_analyzes_the_dialogue_to_identify_lasting_facts_it_s_trained_to_ignore_fleeting_or_unimportant_details_for_example_if_you_say_remind_me_to_call_my_brother_ankit_tomorrow_the_ai_might_create_a_memory_like_the_user_s_brother_is_named_ankit">At the end of a conversation, Panda\'s AI (powered by Google\'s Gemini model) analyzes the dialogue to identify lasting facts. It\'s trained to ignore fleeting or unimportant details. For example, if you say, || remind me to call my brother Ankit tomorrow ||,the AI might create a memory like: || The user\'s brother is named Ankit. ||</string>
     <string name="once_a_memory_is_created_e_g_the_user_lives_in_ghaziabad_it_is_stored_in_a_secure_private_database_directly_on_your_phone_this_database_is_part_of_the_panda_app_s_internal_storage_and_is_not_accessible_by_other_apps">Once a memory is created (e.g., The user lives in Ghaziabad.), it is stored in a secure, private database directly on your phone. This database is part of the Panda app\'s internal storage and is not accessible by other apps.</string>
+    <string name="accessibility_permission_full_desc">This permission is required to read on-screen content and perform actions on your behalf.\n\nThis allows the app to automate tasks and provide voice commands for any app. We do not collect personal data.</string>
+
+    <string name="accessibility_consent_title">Accessibility Permission</string>
+    <string name="accessibility_consent_message">To enable core features, this app needs to be activated in your phone\'s Accessibility settings. This allows the app to understand on-screen context and perform actions for you.\n\nWe value your privacy and do not collect any personal data.</string>
+    <string name="accept">Accept</string>
+    <string name="decline">Decline</string>
+
 </resources>
