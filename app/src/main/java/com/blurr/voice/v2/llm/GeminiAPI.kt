@@ -64,35 +64,6 @@ class GeminiApi(
     // Cache for GenerativeModel instances to avoid repeated initializations.
     private val modelCache = ConcurrentHashMap<String, GenerativeModel>()
 
-    /**
-     * KDoc comment to strongly advise developers to keep this schema synchronized
-     * with the AgentOutput data class to prevent runtime errors.
-     *
-     * IMPORTANT: This schema MUST be kept in sync with the [AgentOutput] data class.
-     * Any changes to [AgentOutput] must be reflected here.
-     */
-//    private val agentOutputSchema = Schema.obj(
-//        name = "agentOutput",
-//        description = "The structured output from the agent.",
-//        Schema.str("thinking", "The agent's inner monologue and reasoning."),
-//        Schema.str("evaluationPreviousGoal", "The agent's evaluation of the previous step's outcome."),
-//        Schema.str("memory", "The agent's short-term memory for the next step."),
-//        Schema.str("nextGoal", "The agent's immediate goal for the current step."),
-//        Schema.arr(
-//            name = "action",
-//            description = "A list of actions to be executed.",
-//            items = Schema.obj(
-//                "actionSpec",
-//                "A single action specification.",
-//                Schema.enum("name", "The name of the action to execute.", ForeignKey.Action.entries.map { it.name }),
-//                Schema.obj(
-//                    "parameters", "A map of parameter names to their values for the action."
-//                    // NOTE: We define `parameters` as a generic object. The LLM will populate it.
-//                    // This is more flexible than defining every parameter for every action.
-//                )
-//            )
-//        )
-//    )
 
 
     private val jsonGenerationConfig = GenerationConfig.builder().apply {
@@ -194,42 +165,6 @@ class GeminiApi(
         val reason = response.promptFeedback?.blockReason?.name ?: "UNKNOWN"
         throw ContentBlockedException("Blocked or empty response from API. Reason: $reason")
     }
-
-    /**
-     * Performs the actual API call to the Gemini model.
-     *
-     * @param messages The list of [GeminiMessage] objects.
-     * @return The response text from the model as a String.
-     * @throws ServerException for API-level errors (e.g., invalid key, rate limits).
-     * @throws ContentBlockedException if the response was blocked for safety reasons.
-     * @throws Exception for other network or unexpected errors.
-     */
-//    private suspend fun performApiCall(messages: List<GeminiMessage>): String {
-//        val apiKey = apiKeyManager.getNextKey()
-//
-//        // Use cached model instance or create a new one if it doesn't exist for the given key.
-//        val generativeModel = modelCache.getOrPut(apiKey) {
-//            Log.d(TAG, "Creating new GenerativeModel instance for key ending in ...${apiKey.takeLast(4)}")
-//            GenerativeModel(
-//                modelName = modelName,
-//                apiKey = apiKey,
-//                generationConfig = jsonGenerationConfig,
-//                requestOptions = requestOptions
-//            )
-//        }
-//
-//        val history = convertToSdkHistory(messages)
-//        val response = generativeModel.generateContent(*history.toTypedArray())
-//
-//        response.text?.let {
-//            Log.d(TAG, "Successfully received response from model.")
-//            return it
-//        }
-//
-//        // Handle cases where the response is empty or blocked.
-//        val reason = response.promptFeedback?.blockReason?.name ?: "UNKNOWN"
-//        throw ContentBlockedException("Blocked or empty response from API. Reason: $reason")
-//    }
 
     /**
      * Converts the internal `List<GeminiMessage>` to the `List<Content>` required by the Google AI SDK.
