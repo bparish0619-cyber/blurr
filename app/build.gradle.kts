@@ -26,8 +26,8 @@ android {
         applicationId = "com.blurr.voice"
         minSdk = 24
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.0.10" +
+        versionCode = 11
+        versionName = "1.0.11" +
                 ""
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -68,6 +68,13 @@ android {
             val googlecloudGatewayURL = localProperties.getProperty("GCLOUD_GATEWAY_URL") ?: ""
             buildConfigField("String", "GCLOUD_GATEWAY_URL", "\"$googlecloudGatewayURL\"")
 
+            val googlecloudProxyURL = localProperties.getProperty("GCLOUD_PROXY_URL") ?: ""
+            val googlecloudProxyURLKey = localProperties.getProperty("GCLOUD_PROXY_URL_KEY") ?: ""
+
+            // Add fields to BuildConfig for the proxy
+            buildConfigField("String", "GCLOUD_PROXY_URL", "\"$googlecloudProxyURL\"")
+            buildConfigField("String", "GCLOUD_PROXY_URL_KEY", "\"$googlecloudProxyURLKey\"")
+
         }
         debug {
             // Also add it to the 'debug' block so it works when you run from Android Studio
@@ -93,6 +100,13 @@ android {
 
             val googlecloudGatewayURL = localProperties.getProperty("GCLOUD_GATEWAY_URL") ?: ""
             buildConfigField("String", "GCLOUD_GATEWAY_URL", "\"$googlecloudGatewayURL\"")
+            // Get properties from local.properties
+            val googlecloudProxyURL = localProperties.getProperty("GCLOUD_PROXY_URL") ?: ""
+            val googlecloudProxyURLKey = localProperties.getProperty("GCLOUD_PROXY_URL_KEY") ?: ""
+
+            // Add fields to BuildConfig for the proxy
+            buildConfigField("String", "GCLOUD_PROXY_URL", "\"$googlecloudProxyURL\"")
+            buildConfigField("String", "GCLOUD_PROXY_URL_KEY", "\"$googlecloudProxyURLKey\"")
 
         }
     }
