@@ -8,6 +8,9 @@ Apply for the closed test: [google form](https://docs.google.com/forms/d/e/1FAIp
 ---
 
 # Demos:
+#### Sending Welcome message to all the new Connections on Linkedin
+ [![Watch the video](https://img.youtube.com/vi/JO_EWFYJJjA/hqdefault.jpg)](https://www.youtube.com/embed/JO_EWFYJJjA)
+
 
 #### 5 task demo: 
 https://github.com/user-attachments/assets/cf76bb00-2bf4-4274-acad-d9f4c0d47188
