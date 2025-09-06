@@ -1,1 +1,47 @@
+# Name of the GitHub Actions workflow
+name: Build Flutter APK
 
+# Controls when the action will run.
+# 'push': triggers on any push to any branch.
+# 'workflow_dispatch': allows you to manually run this workflow from the Actions tab.
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    # Use the latest available Ubuntu virtual machine to run the build
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checks out your repository code so the workflow can access it
+      - uses: actions/checkout@v4
+
+      # 2. Sets up the Java Development Kit (JDK), which is required for Android builds
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 3. Sets up the Flutter SDK environment
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable' # Use the stable channel of Flutter
+
+      # 4. Runs 'flutter pub get' to install all the project dependencies
+      - name: Install dependencies
+        run: flutter pub get
+
+      # 5. Runs the actual build command to create the release APK
+      - name: Build APK
+        run: flutter build apk --release
+
+      # 6. Uploads the generated APK file as a downloadable artifact
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # This name is what the downloadable file artifact will be called
+          name: app-release-apk
+          # This is the path where the 'flutter build apk' command outputs the file
+          path: build/app/outputs/flutter-apk/app-release.apk
+          
